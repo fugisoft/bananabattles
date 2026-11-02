@@ -1,0 +1,2096 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Banana Battles</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&family=Fredoka:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #8fd3ff; font-family: 'Fredoka', system-ui, sans-serif; user-select: none; }
+  canvas { display: block; }
+  .outline { text-shadow: 0 3px 0 #000, 2px 2px 0 #000, -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000, 0 -2px 0 #000; }
+
+  #hud { position: fixed; inset: 0; pointer-events: none; color: #fff; }
+  #crosshair { position: absolute; left: 50%; top: 50%; width: 0; height: 0; }
+  #crosshair i { position: absolute; background: #fff; box-shadow: 0 0 0 1.5px rgba(0,0,0,.7); border-radius: 2px; transition: all .08s; }
+  #crosshair .dot { width: 4px; height: 4px; left: -2px; top: -2px; border-radius: 50%; }
+  #hitmarker { position: absolute; left: 50%; top: 50%; width: 0; height: 0; opacity: 0; }
+  #hitmarker i { position: absolute; width: 3px; height: 11px; background: #fff; box-shadow: 0 0 0 1px #000; left: -1.5px; top: -5.5px; }
+  #hitmarker.show { animation: hm .28s ease-out; }
+  #hitmarker.head i { background: #ff9d00; }
+  #hitmarker.kill i { background: #ff3b3b; height: 15px; top: -7.5px; }
+  @keyframes hm { 0% { opacity: 1; transform: scale(1.5); } 100% { opacity: 0; transform: scale(1); } }
+
+  #topbar { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px; }
+  .pill { background: rgba(20,24,35,.75); border: 3px solid #000; border-radius: 14px; padding: 6px 16px; font-family: 'Luckiest Guy'; font-size: 24px; letter-spacing: 1px; }
+  .pill b { color: #ffd93b; font-weight: normal; }
+
+  #health { position: absolute; left: 24px; bottom: 24px; width: 300px; }
+  #health .label { font-family: 'Luckiest Guy'; font-size: 40px; line-height: 1; margin-bottom: 6px; }
+  #health .bar { height: 22px; background: rgba(0,0,0,.6); border: 3px solid #000; border-radius: 8px; overflow: hidden; }
+  #health .stamLabel { font-family: 'Luckiest Guy'; font-size: 15px; letter-spacing: 1px; margin-top: 6px; line-height: 1; color: #8fe3ff; }
+  #health .stam { height: 10px; margin-top: 3px; background: rgba(0,0,0,.6); border: 2px solid #000; border-radius: 5px; overflow: hidden; }
+  #stamFill { height: 100%; width: 100%; background: linear-gradient(#8fe3ff, #2f9fe0); }
+  #stamFill.tired { background: linear-gradient(#ff9d6e, #d4552a); }
+  #health .fill { height: 100%; width: 100%; background: linear-gradient(#7dff6e, #2fc63b); transition: width .12s; }
+
+  #ammo { position: absolute; right: 28px; bottom: 24px; text-align: right; }
+  #ammo .name { font-family: 'Luckiest Guy'; font-size: 22px; color: #ffd93b; }
+  #ammo .count { font-family: 'Luckiest Guy'; font-size: 58px; line-height: 1; }
+  #ammo .count small { font-size: 28px; opacity: .85; }
+  #ammo .reload { height: 8px; width: 200px; margin-left: auto; margin-top: 6px; background: rgba(0,0,0,.6); border: 2px solid #000; border-radius: 4px; overflow: hidden; visibility: hidden; }
+  #ammo .reload div { height: 100%; width: 0; background: #ffd93b; }
+
+  #slots { position: absolute; bottom: 22px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px; }
+  .slot { width: 110px; height: 70px; background: rgba(20,24,35,.7); border: 3px solid #000; border-radius: 12px; position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; transition: transform .12s, background .12s; }
+  .slot .k { position: absolute; top: 3px; left: 7px; font-family: 'Luckiest Guy'; font-size: 16px; color: #ffd93b; }
+  .slot .ico { font-size: 26px; line-height: 1; }
+  .slot .n { font-family: 'Luckiest Guy'; font-size: 14px; margin-top: 4px; letter-spacing: .5px; }
+  .slot.active { background: rgba(255,200,30,.85); transform: translateY(-8px) scale(1.05); }
+  .slot.active .k { color: #000; }
+  .slot .a { position: absolute; top: 3px; right: 8px; font-family: 'Luckiest Guy'; font-size: 14px; color: #fff; }
+  .slot .a.empty { color: #ff5050; }
+  #noAmmo { position: absolute; left: 50%; top: 56%; transform: translateX(-50%); font-family: 'Luckiest Guy'; font-size: 30px; color: #ff5050; text-align: center; display: none; }
+  #noAmmo small { display: block; font-size: 17px; color: #fff; letter-spacing: .5px; }
+
+  #feed { position: absolute; top: 16px; right: 16px; display: flex; flex-direction: column; gap: 6px; align-items: flex-end; }
+  .feed { background: rgba(20,24,35,.75); border: 2px solid #000; border-radius: 8px; padding: 4px 12px; font-weight: 700; font-size: 16px; transition: opacity .5s; }
+  .feed .me { color: #6ec8ff; } .feed .mk { color: #ff8a5c; } .feed.out { opacity: 0; }
+
+  #ko { position: absolute; left: 50%; top: 62%; transform: translateX(-50%); font-family: 'Luckiest Guy'; font-size: 34px; color: #ff4d4d; opacity: 0; }
+  #ko.show { animation: ko 1.2s ease-out; }
+  @keyframes ko { 0% { opacity: 0; transform: translateX(-50%) scale(2); } 15% { opacity: 1; transform: translateX(-50%) scale(1); } 75% { opacity: 1; } 100% { opacity: 0; transform: translateX(-50%) translateY(-20px); } }
+
+  #dmgLayer { position: absolute; inset: 0; overflow: hidden; }
+  .dmg { position: absolute; left: 0; top: 0; font-family: 'Luckiest Guy'; font-size: 30px; color: #fff; white-space: nowrap; will-change: transform; }
+  .dmg.head { color: #ffb020; font-size: 36px; }
+
+  #vignette { position: absolute; inset: 0; opacity: 0; background: radial-gradient(ellipse at center, transparent 45%, rgba(220,0,0,.75) 100%); }
+  #scope { position: absolute; inset: 0; display: none; background: radial-gradient(circle at center, transparent 0, transparent 34vmin, #000 34.4vmin); }
+  #scope::before, #scope::after { content: ''; position: absolute; background: #000; }
+  #scope::before { left: 0; right: 0; top: 50%; height: 2px; margin-top: -1px; }
+  #scope::after { top: 0; bottom: 0; left: 50%; width: 2px; margin-left: -1px; }
+  #scope .ring { position: absolute; left: 50%; top: 50%; width: 6px; height: 6px; margin: -3px; border-radius: 50%; background: #ff3030; }
+
+  .overlay { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: radial-gradient(ellipse at center, rgba(30,60,20,.55), rgba(0,0,0,.8)); color: #fff; z-index: 10; }
+  .panel { text-align: center; padding: 16px; max-width: 640px; width: 100%; }
+  h1 { font-family: 'Luckiest Guy'; font-size: clamp(56px, 12vw, 110px); line-height: .9; margin: 0 0 6px; color: #ffd93b; letter-spacing: 3px;
+       text-shadow: 0 8px 0 #7a4a0a, 4px 4px 0 #000, -4px -4px 0 #000, 4px -4px 0 #000, -4px 4px 0 #000, 0 12px 20px rgba(0,0,0,.5); transform: rotate(-3deg); }
+  .sub { font-size: 20px; font-weight: 700; opacity: .9; margin-bottom: 26px; }
+  #play, .bigbtn { pointer-events: auto; font-family: 'Luckiest Guy'; font-size: 40px; padding: 12px 56px 6px; background: #3ddc4f; color: #fff; border: 4px solid #000; border-radius: 16px; cursor: pointer;
+          box-shadow: 0 7px 0 #1b8a28, 0 7px 0 3px #000; text-shadow: 0 3px 0 #000, 2px 2px 0 #000, -2px -2px 0 #000; transition: transform .08s; }
+  #play:hover, .bigbtn:hover { transform: translateY(-2px) scale(1.04); }
+  #play:active, .bigbtn:active { transform: translateY(4px); box-shadow: 0 3px 0 #1b8a28, 0 3px 0 3px #000; }
+  .controls { margin: 30px auto 0; display: grid; grid-template-columns: auto auto; gap: 6px 18px; justify-content: center; text-align: left; font-size: 16px; font-weight: 500; }
+  .controls kbd { display: inline-block; min-width: 26px; text-align: center; background: #fff; color: #000; border-radius: 6px; padding: 1px 7px; font-family: 'Fredoka'; font-weight: 700; box-shadow: 0 3px 0 #999; margin-right: 3px; }
+  #death, #win, #pause, #settings, #upgrades, #diff { display: none; }
+  #diff { z-index: 13; background: radial-gradient(ellipse at center, rgba(20,40,15,.92), rgba(0,0,0,.95)); }
+  .diffgrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+  @media (max-width: 560px) { .diffgrid { grid-template-columns: 1fr; } }
+  .diffcard { pointer-events: auto; display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 18px 14px 16px; cursor: pointer; color: #fff;
+              background: #2f9e3f; border: 4px solid #000; border-radius: 16px; box-shadow: 0 7px 0 #1b6a28, 0 7px 0 3px #000; transition: transform .08s; font-family: 'Fredoka'; }
+  .diffcard.hard { background: #c9302c; box-shadow: 0 7px 0 #7a1714, 0 7px 0 3px #000; }
+  .diffcard:hover { transform: translateY(-2px) scale(1.03); }
+  .diffcard:active { transform: translateY(4px); }
+  .diffcard .dname { font-family: 'Luckiest Guy'; font-size: 36px; letter-spacing: 2px; line-height: 1; }
+  .diffcard .ddesc { font-size: 15px; font-weight: 700; line-height: 1.35; }
+  @media (max-height: 520px) { .diffcard { padding: 10px; } .diffcard .dname { font-size: 26px; } .diffcard .ddesc { font-size: 13px; } }
+
+  /* ---------- touch / mobile ---------- */
+  html, body { touch-action: none; overscroll-behavior: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+  .overlay { overflow-y: auto; touch-action: pan-y; }
+  .touchHelp { display: none; margin: 18px auto 0; font-size: 15px; font-weight: 700; opacity: .85; max-width: 560px; line-height: 1.5; }
+  body.touch .touchHelp { display: block; }
+  body.touch .controls { display: none; }
+  #touch { position: fixed; inset: 0; z-index: 5; display: none; touch-action: none; -webkit-tap-highlight-color: transparent; }
+  #joyBase { position: absolute; width: 120px; height: 120px; margin: -60px 0 0 -60px; border-radius: 50%; background: rgba(255,255,255,.12); border: 3px solid rgba(0,0,0,.45); display: none; pointer-events: none; }
+  #joyKnob { position: absolute; left: 50%; top: 50%; width: 54px; height: 54px; margin: -27px 0 0 -27px; border-radius: 50%; background: rgba(255,217,59,.85); border: 3px solid #000; }
+  #joyKnob.sprint { background: rgba(143,227,255,.95); }
+  .tbtn { position: absolute; border-radius: 50%; border: 3px solid #000; background: rgba(20,24,35,.55); color: #fff; font-family: 'Luckiest Guy'; letter-spacing: 1px;
+          text-shadow: 0 2px 0 #000; touch-action: none; padding: 0; -webkit-tap-highlight-color: transparent; }
+  .tbtn.on { background: rgba(255,200,30,.85); color: #000; text-shadow: none; }
+  #tFire { width: 96px; height: 96px; right: calc(28px + env(safe-area-inset-right)); bottom: 34px; font-size: 22px; background: rgba(230,60,60,.6); }
+  #tFire.on { background: rgba(255,90,90,.9); color: #fff; text-shadow: 0 2px 0 #000; }
+  #tAim { width: 66px; height: 66px; right: calc(140px + env(safe-area-inset-right)); bottom: 30px; font-size: 16px; }
+  #tJump { width: 66px; height: 66px; right: calc(118px + env(safe-area-inset-right)); bottom: 112px; font-size: 15px; }
+  #tReload { width: 54px; height: 54px; right: calc(46px + env(safe-area-inset-right)); bottom: 146px; font-size: 20px; }
+  #tPause { width: 46px; height: 46px; left: calc(12px + env(safe-area-inset-left)); top: 10px; font-size: 18px; border-radius: 12px; }
+  #rotate { display: none; position: fixed; inset: 0; z-index: 50; background: rgba(0,0,0,.92); color: #fff; flex-direction: column; align-items: center; justify-content: center;
+            font-family: 'Luckiest Guy'; font-size: 26px; letter-spacing: 1px; text-align: center; padding: 16px; }
+  #rotate .ico { font-size: 64px; margin-bottom: 12px; }
+  @media (orientation: portrait) { body.touch #rotate { display: flex; } }
+
+  /* smaller HUD on phones, moved clear of the touch buttons */
+  body.touch #hud { z-index: 6; }   /* above the touch layer so gun slots can be tapped; the rest of the HUD ignores touches */
+  body.touch #health { left: calc(70px + env(safe-area-inset-left)); top: 10px; bottom: auto; width: 170px; }
+  body.touch #health .label { font-size: 24px; margin-bottom: 3px; }
+  body.touch #health .bar { height: 14px; border-width: 2px; }
+  body.touch #health .stamLabel { font-size: 11px; margin-top: 4px; }
+  body.touch #health .stam { height: 7px; }
+  body.touch #ammo { right: calc(12px + env(safe-area-inset-right)); top: 8px; bottom: auto; }
+  body.touch #ammo .name { font-size: 14px; }
+  body.touch #ammo .count { font-size: 34px; }
+  body.touch #ammo .count small { font-size: 18px; }
+  body.touch #ammo .reload { width: 120px; }
+  body.touch #feed { top: 86px; right: calc(12px + env(safe-area-inset-right)); }
+  body.touch .feed { font-size: 12px; padding: 2px 8px; }
+  body.touch #topbar { top: 8px; gap: 6px; }
+  body.touch .pill { font-size: 15px; padding: 3px 9px; border-width: 2px; border-radius: 10px; }
+  body.touch #bossBar { top: 46px; width: min(420px, calc(100vw - 420px)); min-width: 220px; }
+  body.touch #bossBar .bname { font-size: 15px; } body.touch #bossBar .bname span { font-size: 12px; }
+  body.touch #bossBar .bbar { height: 14px; }
+  body.touch #slots { bottom: 10px; gap: 6px; }
+  body.touch .slot { width: 74px; height: 50px; pointer-events: auto; border-width: 2px; }
+  body.touch .slot .ico { font-size: 18px; } body.touch .slot .n { font-size: 11px; } body.touch .slot .k { display: none; }
+  body.touch .slot.active { transform: translateY(-4px) scale(1.04); }
+  body.touch #ko { font-size: 24px; }
+  body.touch #noAmmo { font-size: 22px; } body.touch #noAmmo small { font-size: 13px; }
+  body.touch .dmg { font-size: 22px; } body.touch .dmg.head { font-size: 26px; }
+
+  /* menus on short (landscape phone) screens */
+  @media (max-height: 520px) {
+    .overlay { align-items: flex-start; }
+    .panel { padding: 12px 16px 20px; }
+    h1 { font-size: clamp(38px, 9vh, 64px); margin-bottom: 4px; }
+    .sub { font-size: 14px; margin-bottom: 12px; }
+    #play, .bigbtn { font-size: 24px; padding: 9px 26px 4px; }
+    .btnrow { gap: 12px; }
+    .bank { font-size: 18px; margin-top: 10px; }
+    .settingsTitle { font-size: 40px; margin-bottom: 12px; }
+    .setting { font-size: 16px; }
+    #death h2 { font-size: 44px; }
+    .upgrid { gap: 10px; margin-top: 10px; }
+    .upcard { padding: 8px; } .upcard .ico { font-size: 24px; } .upcard .nm { font-size: 17px; }
+    .upbtn { font-size: 15px; padding: 6px 4px 3px; margin-top: 8px; }
+  }
+  #upgrades { z-index: 13; background: radial-gradient(ellipse at center, rgba(20,40,15,.92), rgba(0,0,0,.95)); overflow-y: auto; }
+  .bigbtn.gold { background: #ffb020; box-shadow: 0 7px 0 #a8650a, 0 7px 0 3px #000; }
+  .bigbtn.gold:active { box-shadow: 0 3px 0 #a8650a, 0 3px 0 3px #000; }
+  .bank { font-family: 'Luckiest Guy'; font-size: 24px; margin-top: 18px; letter-spacing: 1px; }
+  .bank b { color: #ffd93b; font-weight: normal; }
+  .upgrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-top: 18px; }
+  @media (max-width: 720px) { .upgrid { grid-template-columns: 1fr; } }
+  .upcard { background: rgba(20,24,35,.85); border: 3px solid #000; border-radius: 14px; padding: 14px 12px; }
+  .upcard .ico { font-size: 34px; line-height: 1.1; }
+  .upcard .nm { font-family: 'Luckiest Guy'; font-size: 22px; color: #ffd93b; letter-spacing: .5px; }
+  .upcard .lv { font-size: 14px; font-weight: 700; opacity: .85; }
+  .pips { display: flex; gap: 5px; justify-content: center; margin: 8px 0 10px; }
+  .pips i { width: 24px; height: 11px; border: 2px solid #000; border-radius: 3px; background: #3a3f4c; }
+  .pips i.on { background: #ffd93b; }
+  .upstat { font-size: 15px; font-weight: 700; margin: 3px 0; }
+  .upstat b { font-weight: 700; } .upstat b.up { color: #7dff6e; }
+  .upbtn { margin-top: 12px; width: 100%; font-family: 'Luckiest Guy'; font-size: 19px; letter-spacing: .5px; padding: 9px 6px 5px; border: 3px solid #000; border-radius: 10px;
+           background: #3ddc4f; color: #fff; cursor: pointer; text-shadow: 0 2px 0 #000; box-shadow: 0 4px 0 #1b8a28; }
+  .upbtn:hover:not(:disabled) { filter: brightness(1.08); }
+  .upbtn:active:not(:disabled) { transform: translateY(3px); box-shadow: 0 1px 0 #1b8a28; }
+  .upbtn:disabled { background: #5d6270; box-shadow: 0 4px 0 #353843; cursor: not-allowed; }
+  .upbtn.max { background: #ffc531; color: #000; text-shadow: none; box-shadow: 0 4px 0 #a8650a; cursor: default; }
+  #settings { z-index: 13; background: radial-gradient(ellipse at center, rgba(20,40,15,.92), rgba(0,0,0,.95)); }
+  .settingsTitle { font-family: 'Luckiest Guy'; font-size: 64px; color: #ffd93b; margin: 0 0 24px; letter-spacing: 2px; }
+  .setting { display: flex; align-items: center; justify-content: center; gap: 14px; flex-wrap: wrap; font-size: 20px; font-weight: 700; }
+  .setting label { min-width: 170px; text-align: right; }
+  .setting input[type=range] { width: min(300px, 70vw); accent-color: #ffd93b; cursor: pointer; }
+  #sensVal { font-family: 'Luckiest Guy'; font-size: 24px; color: #ffd93b; min-width: 70px; text-align: left; }
+  .smallbtn { font-family: 'Fredoka'; font-weight: 700; font-size: 15px; padding: 5px 14px; border: 3px solid #000; border-radius: 10px; background: #fff; color: #000; cursor: pointer; }
+  .smallbtn:hover { background: #ffe680; }
+  #pause { z-index: 12; }
+  #pauseStats b { color: #ffd93b; }
+  #win { z-index: 11; }
+  #winStats b { color: #ffd93b; }
+  .btnrow { display: flex; gap: 18px; justify-content: center; flex-wrap: wrap; }
+  .bigbtn.alt { background: #4aa3ff; box-shadow: 0 7px 0 #1f5f9e, 0 7px 0 3px #000; }
+  .bigbtn.alt:active { box-shadow: 0 3px 0 #1f5f9e, 0 3px 0 3px #000; }
+
+  #bossBar { position: absolute; top: 72px; left: 50%; transform: translateX(-50%); width: min(620px, calc(100vw - 32px)); display: none; text-align: center; }
+  #bossBar .bname { font-family: 'Luckiest Guy'; font-size: 26px; color: #ffd93b; letter-spacing: 1px; margin-bottom: 4px; }
+  #bossBar .bname span { color: #fff; font-size: 18px; margin-left: 8px; }
+  #bossBar .bbar { height: 24px; background: rgba(0,0,0,.65); border: 3px solid #000; border-radius: 10px; overflow: hidden; }
+  #bossFill { height: 100%; width: 100%; background: linear-gradient(#ffb04a, #e0571b); transition: width .15s; }
+  #bossFill.enraged { background: linear-gradient(#ff6a6a, #c41414); }
+
+  #banner { position: absolute; left: 0; right: 0; top: 26%; text-align: center; opacity: 0; padding: 0 16px; }
+  #banner .big { font-family: 'Luckiest Guy'; font-size: clamp(48px, 10vw, 96px); color: #ffd93b; letter-spacing: 3px; line-height: 1; }
+  #banner .small { font-family: 'Luckiest Guy'; font-size: clamp(18px, 3vw, 28px); margin-top: 8px; letter-spacing: 1px; }
+  #banner.show { animation: bannerAnim 3s ease-out forwards; }
+  @keyframes bannerAnim { 0% { opacity: 0; transform: scale(1.8); } 10% { opacity: 1; transform: scale(1); } 85% { opacity: 1; transform: scale(1); } 100% { opacity: 0; transform: translateY(-20px); } }
+  #death h2 { font-family: 'Luckiest Guy'; font-size: 72px; margin: 0; color: #ff5050; }
+  #death p { font-size: 22px; font-weight: 700; }
+</style>
+<script type="importmap">
+{ "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
+</script>
+</head>
+<body>
+
+<div id="hud">
+  <div id="dmgLayer"></div>
+  <div id="vignette"></div>
+  <div id="scope"><div class="ring"></div></div>
+  <div id="crosshair"><i class="dot"></i><i id="chT"></i><i id="chB"></i><i id="chL"></i><i id="chR"></i></div>
+  <div id="hitmarker"><i style="transform:rotate(45deg) translateY(-10px)"></i><i style="transform:rotate(135deg) translateY(-10px)"></i><i style="transform:rotate(225deg) translateY(-10px)"></i><i style="transform:rotate(315deg) translateY(-10px)"></i></div>
+  <div id="topbar"><div class="pill outline">Wave <b id="waveNum">1/5</b></div><div class="pill outline" id="leftPill">Left <b id="leftNum">0</b></div><div class="pill outline">KOs <b id="kills">0</b></div></div>
+  <div id="bossBar"><div class="bname outline">👑 THE BANANA KING <span id="bossHp"></span></div><div class="bbar"><div id="bossFill"></div></div></div>
+  <div id="banner"><div class="big outline" id="bannerBig"></div><div class="small outline" id="bannerSmall"></div></div>
+  <div id="feed"></div>
+  <div id="ko" class="outline">MONKEY BONKED!</div>
+  <div id="noAmmo" class="outline">OUT OF AMMO!<small>Shoot supply crates or bonk monkeys for more</small></div>
+  <div id="health"><div class="label outline" id="hpText">100</div><div class="bar"><div class="fill" id="hpFill"></div></div><div class="stamLabel outline">STAMINA</div><div class="stam"><div id="stamFill"></div></div></div>
+  <div id="slots"></div>
+  <div id="ammo"><div class="name outline" id="wName">Banana Pistol</div><div class="count outline" id="ammoCount">12<small> / ∞</small></div><div class="reload" id="reloadBar"><div></div></div></div>
+</div>
+
+<div id="touch">
+  <div id="joyBase"><div id="joyKnob"></div></div>
+  <button class="tbtn" id="tPause" data-act="pause">II</button>
+  <button class="tbtn" id="tFire" data-act="fire">FIRE</button>
+  <button class="tbtn" id="tAim" data-act="aim">AIM</button>
+  <button class="tbtn" id="tJump" data-act="jump">JUMP</button>
+  <button class="tbtn" id="tReload" data-act="reload">R</button>
+</div>
+
+<div id="rotate"><div class="ico">📱↻</div>Turn your phone sideways to play</div>
+
+<div id="menu" class="overlay">
+  <div class="panel">
+    <h1>BANANA<br>BATTLES</h1>
+    <div class="sub">Survive 5 waves of monkeys (10 on Hard), then defeat the Banana King!<br>Ammo is limited: shoot 📦 supply crates and bonk monkeys for more.<br>Health doesn't regenerate: shoot ➕ medkit crates or bonk monkeys for medkits.<br>Watch out for 🍌 Hunter Monkeys (they shoot back!) and 💪 Brute Monkeys.</div>
+    <div class="btnrow"><button id="play">PLAY</button><button id="upgradesBtn" class="bigbtn gold">UPGRADES</button><button class="bigbtn alt settingsBtn">SETTINGS</button></div>
+    <div class="bank outline">🍌 KOs to spend: <b id="menuKos">0</b></div>
+    <div class="touchHelp">Left side: drag to move (push all the way forward to sprint) · Right side: drag to look<br>Hold FIRE to shoot (drag on it to aim while firing) · Tap a gun at the bottom to switch</div>
+    <div class="controls">
+      <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></div><div>Move</div>
+      <div><kbd>Mouse</kbd></div><div>Look</div>
+      <div><kbd>Left Click</kbd></div><div>Shoot</div>
+      <div><kbd>Right Click</kbd></div><div>Aim / Sniper scope</div>
+      <div><kbd>Space</kbd></div><div>Jump</div>
+      <div><kbd>Shift</kbd></div><div>Sprint</div>
+      <div><kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> / <kbd>Wheel</kbd></div><div>Switch gun</div>
+      <div><kbd>Q</kbd></div><div>Last gun</div>
+      <div><kbd>R</kbd></div><div>Reload</div>
+      <div><kbd>Esc</kbd></div><div>Pause</div>
+    </div>
+  </div>
+</div>
+
+<div id="pause" class="overlay">
+  <div class="panel">
+    <h1>PAUSED</h1>
+    <div class="sub" id="pauseStats"></div>
+    <div class="btnrow"><button id="resume" class="bigbtn">RESUME</button><button class="bigbtn alt settingsBtn">SETTINGS</button><button id="quit" class="bigbtn alt">QUIT TO MENU</button></div>
+    <div class="sub" style="margin-top:22px;font-size:15px;opacity:.75">Quitting ends this run. Your progress won't be saved.</div>
+  </div>
+</div>
+
+<div id="diff" class="overlay">
+  <div class="panel" style="max-width:720px">
+    <h2 class="outline settingsTitle">CHOOSE DIFFICULTY</h2>
+    <div class="diffgrid">
+      <button class="diffcard" data-diff="normal">
+        <span class="dname outline">NORMAL</span>
+        <span class="ddesc">The standard challenge. 5 waves, then the Banana King.</span>
+      </button>
+      <button class="diffcard hard" data-diff="hard">
+        <span class="dname outline">HARD</span>
+        <span class="ddesc">10 waves instead of 5. Monkeys and the boss have 50% more health, hit 40% harder and move 15% faster. Fewer ammo and medkit drops.</span>
+      </button>
+    </div>
+    <div class="btnrow" style="margin-top:22px"><button id="diffBack" class="bigbtn alt">BACK</button></div>
+  </div>
+</div>
+
+<div id="upgrades" class="overlay">
+  <div class="panel" style="max-width:820px">
+    <h2 class="outline settingsTitle">UPGRADES</h2>
+    <div class="bank outline" style="margin-top:0">🍌 KOs to spend: <b id="upKos">0</b></div>
+    <div class="sub" style="font-size:16px;margin:6px 0 0">Each upgrade adds damage and fire rate. Bonk monkeys to earn KOs!</div>
+    <div class="upgrid" id="upCards"></div>
+    <div class="btnrow" style="margin-top:20px"><button id="upgradesBack" class="bigbtn">BACK</button></div>
+  </div>
+</div>
+
+<div id="settings" class="overlay">
+  <div class="panel">
+    <h2 class="outline settingsTitle">SETTINGS</h2>
+    <div class="setting">
+      <label for="sens">Mouse sensitivity</label>
+      <input type="range" id="sens" min="0.1" max="3" step="0.05" value="1">
+      <span id="sensVal" class="outline">1.00×</span>
+      <button id="sensReset" class="smallbtn">Reset</button>
+    </div>
+    <div class="setting" style="margin-top:18px">
+      <label for="vol">Volume</label>
+      <input type="range" id="vol" min="0" max="1" step="0.05" value="1">
+      <span id="volVal" class="outline">100%</span>
+      <button id="volReset" class="smallbtn">Reset</button>
+    </div>
+    <div class="setting" style="margin-top:18px">
+      <label for="fov">Field of view</label>
+      <input type="range" id="fov" min="60" max="100" step="1" value="75">
+      <span id="fovVal" class="outline">75°</span>
+      <button id="fovReset" class="smallbtn">Reset</button>
+    </div>
+    <div class="btnrow" style="margin-top:28px"><button id="settingsBack" class="bigbtn">BACK</button></div>
+  </div>
+</div>
+
+<div id="win" class="overlay">
+  <div class="panel">
+    <h1>YOU WIN!</h1>
+    <div class="sub" id="winStats"></div>
+    <div class="btnrow"><button id="again" class="bigbtn">PLAY AGAIN</button><button id="toMenu" class="bigbtn alt">MAIN MENU</button></div>
+  </div>
+</div>
+
+<div id="death" class="overlay">
+  <div class="panel">
+    <h2 class="outline">YOU GOT BONKED!</h2>
+    <p class="outline" id="deathText">Respawning in 3...</p>
+  </div>
+</div>
+
+<script type="module">
+import * as THREE from 'three';
+
+// ============================================================
+//  Setup
+// ============================================================
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+const isTouch = matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0 && !matchMedia('(pointer: fine)').matches;
+if (isTouch) document.body.classList.add('touch');
+renderer.setPixelRatio(Math.min(devicePixelRatio, isTouch ? 1.5 : 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.autoClear = false;
+document.body.prepend(renderer.domElement);
+
+const SKY = 0x8fd3ff;
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(SKY);
+scene.fog = new THREE.Fog(SKY, 70, 160);
+
+const DEFAULT_FOV = 75;
+let BASE_FOV = DEFAULT_FOV;   // changed from the settings screen
+const camera = new THREE.PerspectiveCamera(BASE_FOV, innerWidth / innerHeight, 0.03, 500);
+camera.rotation.order = 'YXZ';
+scene.add(camera);
+
+const hemi = new THREE.HemisphereLight(0xeaf6ff, 0x5d8a3a, 1.1);
+hemi.layers.enable(1);
+scene.add(hemi);
+const sun = new THREE.DirectionalLight(0xfff3d6, 2.2);
+sun.position.set(30, 55, 20);
+sun.castShadow = true;
+sun.shadow.mapSize.set(isTouch ? 1024 : 2048, isTouch ? 1024 : 2048);
+Object.assign(sun.shadow.camera, { left: -48, right: 48, top: 48, bottom: -48, near: 1, far: 140 });
+sun.shadow.bias = -0.0005;
+sun.shadow.normalBias = 0.03;
+sun.layers.enable(1);
+scene.add(sun);
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+// ============================================================
+//  Helpers
+// ============================================================
+const V3 = THREE.Vector3;
+const rand = (a, b) => a + Math.random() * (b - a);
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+function mulberry32(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function lerpAngle(a, b, t) { const d = ((b - a + Math.PI) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) - Math.PI; return a + d * t; }
+const mat = (c, o = {}) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.85, metalness: 0, flatShading: true, ...o });
+function box(w, h, d, m) { const me = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); me.castShadow = me.receiveShadow = true; return me; }
+
+function canvasTex(size, draw, rx = 1, ry = 1) {
+  const c = document.createElement('canvas'); c.width = c.height = size;
+  draw(c.getContext('2d'), size);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(rx, ry);
+  t.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  return t;
+}
+
+const M = {
+  banana: mat(0xffd93b, { roughness: 0.6 }),
+  stem: mat(0x5a3a1a),
+  wood: mat(0x9a6230),
+  dark: mat(0x353a46, { roughness: 0.45, metalness: 0.4 }),
+  lens: new THREE.MeshBasicMaterial({ color: 0x66ffcc }),
+  trunk: mat(0x7d5531), trunk2: mat(0x684628),
+  leaves: [mat(0x3fae4d), mat(0x2f9440), mat(0x58c35e), mat(0x26803a)],
+  coconut: mat(0x6b4423),
+  rock: mat(0x8d939e),
+  cover: mat(0xd9dde6),
+  accent: mat(0xffc531),
+  pillar: mat(0x5f6b85),
+};
+
+// ============================================================
+//  Banana geometry
+// ============================================================
+function makeBanana(len, r, bend, material = M.banana) {
+  const g = new THREE.Group();
+  const curve = new THREE.QuadraticBezierCurve3(new V3(0, 0, len / 2), new V3(0, bend, 0), new V3(0, 0, -len / 2));
+  g.add(new THREE.Mesh(new THREE.TubeGeometry(curve, 10, r, 8, false), material));
+  const capGeo = new THREE.SphereGeometry(r, 8, 6);
+  const c1 = new THREE.Mesh(capGeo, material); c1.position.z = len / 2;
+  const c2 = new THREE.Mesh(capGeo, material); c2.position.z = -len / 2;
+  const tip = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.3, r * 0.55, r * 1.4, 6), M.stem);
+  tip.rotation.x = Math.PI / 2; tip.position.z = -len / 2 - r * 0.9;
+  const nub = new THREE.Mesh(new THREE.BoxGeometry(r * 0.7, r * 0.7, r * 0.7), M.stem);
+  nub.position.z = len / 2 + r * 0.9;
+  g.add(c1, c2, tip, nub);
+  return g;
+}
+
+// ============================================================
+//  World: arena, cover, jungle
+// ============================================================
+const HALF = 34;           // arena half-size
+const WALL_H = 8;
+const GRAV = 25;
+const boxes = [];          // THREE.Box3 colliders
+const trees = [];          // {x,z,r,h}
+
+function addBlock(x, y, z, w, h, d, m, collide = true) {
+  const me = box(w, h, d, m);
+  me.position.set(x, y + h / 2, z);
+  scene.add(me);
+  if (collide) boxes.push(new THREE.Box3().setFromObject(me));
+  return me;
+}
+
+// floor
+const grassTex = canvasTex(256, (g, s) => {
+  g.fillStyle = '#5cbf4a'; g.fillRect(0, 0, s, s);
+  const r = mulberry32(7);
+  for (let i = 0; i < 220; i++) { g.fillStyle = r() < .5 ? 'rgba(40,120,40,.18)' : 'rgba(150,230,110,.16)'; g.fillRect(r() * s, r() * s, 6 + r() * 14, 6 + r() * 14); }
+  g.strokeStyle = 'rgba(30,90,30,.35)'; g.lineWidth = 4; g.strokeRect(0, 0, s, s);
+}, HALF / 2, HALF / 2);
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(HALF * 2 + 4, HALF * 2 + 4), new THREE.MeshStandardMaterial({ map: grassTex, roughness: 1 }));
+floor.rotation.x = -Math.PI / 2;
+floor.receiveShadow = true;
+scene.add(floor);
+
+// outer ground (beyond walls) so the world doesn't float
+const outer = new THREE.Mesh(new THREE.PlaneGeometry(600, 600), mat(0x4a9e3c, { flatShading: false }));
+outer.rotation.x = -Math.PI / 2; outer.position.y = -0.05;
+scene.add(outer);
+
+// walls
+function wallMat(len) {
+  const t = canvasTex(256, (g, s) => {
+    g.fillStyle = '#e9e4d4'; g.fillRect(0, 0, s, s);
+    g.fillStyle = '#d8d1bd'; g.fillRect(0, s * 0.62, s, s * 0.38);
+    g.fillStyle = '#2f9e5a'; g.fillRect(0, s * 0.56, s, s * 0.06);
+    g.strokeStyle = '#bdb59e'; g.lineWidth = 6; g.strokeRect(0, 0, s, s);
+  }, len / 8, 1);
+  return new THREE.MeshStandardMaterial({ map: t, roughness: 0.9 });
+}
+const W2 = HALF * 2 + 4;
+addBlock(0, 0, -HALF - 1, W2, WALL_H, 2, wallMat(W2));
+addBlock(0, 0, HALF + 1, W2, WALL_H, 2, wallMat(W2));
+addBlock(-HALF - 1, 0, 0, 2, WALL_H, W2, wallMat(W2));
+addBlock(HALF + 1, 0, 0, 2, WALL_H, W2, wallMat(W2));
+// yellow trim on top
+for (const [x, z, w, d] of [[0, -HALF - 1, W2 + .4, 2.4], [0, HALF + 1, W2 + .4, 2.4], [-HALF - 1, 0, 2.4, W2 + .4], [HALF + 1, 0, 2.4, W2 + .4]])
+  addBlock(x, WALL_H, z, w, 0.5, d, M.accent, false);
+
+// crates
+const crateMat = new THREE.MeshStandardMaterial({ roughness: 0.9, map: canvasTex(128, (g, s) => {
+  g.fillStyle = '#b07a3e'; g.fillRect(0, 0, s, s);
+  g.fillStyle = '#9a6531'; for (let i = 0; i < 4; i++) g.fillRect(0, i * s / 4 + 2, s, 3);
+  g.strokeStyle = '#6e4420'; g.lineWidth = 12; g.strokeRect(6, 6, s - 12, s - 12);
+  g.lineWidth = 10; g.beginPath(); g.moveTo(10, 10); g.lineTo(s - 10, s - 10); g.moveTo(s - 10, 10); g.lineTo(10, s - 10); g.stroke();
+}) });
+const CR = 1.6;
+function crate(x, z, level = 0) { addBlock(x, level * CR, z, CR, CR, CR, crateMat); }
+
+// central platform
+addBlock(0, 0, 0, 7, 1, 7, M.pillar);
+addBlock(0, 1, 0, 7.2, 0.15, 7.2, M.accent, false);
+crate(-2.4, -2.4, 0.72); crate(2.4, 2.4, 0.72);
+// low cover walls
+addBlock(0, 0, -15, 7, 2.2, 1.2, M.cover);
+addBlock(0, 0, 15, 7, 2.2, 1.2, M.cover);
+addBlock(-15, 0, 0, 1.2, 2.2, 7, M.cover);
+addBlock(15, 0, 0, 1.2, 2.2, 7, M.cover);
+// tall corner pillars
+for (const [x, z] of [[-21, -21], [21, 21], [21, -21], [-21, 21]]) {
+  addBlock(x, 0, z, 3.4, 6, 3.4, M.pillar);
+  addBlock(x, 6, z, 3.8, 0.4, 3.8, M.accent, false);
+}
+// crate clusters
+crate(-8, -7); crate(-6.4, -7); crate(-8, -7, 1);
+crate(9, 8); crate(9, 9.6); crate(9, 8, 1);
+crate(10, -9); crate(-10, 10);
+crate(26, 2); crate(26, 3.6);
+crate(-26, -3); crate(-26, -3, 1);
+crate(5, 24); crate(-7, -26); crate(13, -27); crate(-27, 14);
+
+// trees
+function palmTree(x, z, s) {
+  const g = new THREE.Group(); g.position.set(x, 0, z);
+  const n = 6, segH = 1.15 * s;
+  const lean = rand(0, Math.PI * 2), leanAmt = rand(0.6, 1.8) * s;
+  let top = new V3();
+  for (let i = 0; i < n; i++) {
+    const f = i / n, f2 = (i + 1) / n;
+    const seg = new THREE.Mesh(new THREE.CylinderGeometry(0.24 * s * (1 - f * 0.3), 0.32 * s * (1 - f * 0.3), segH * 1.05, 7), i % 2 ? M.trunk : M.trunk2);
+    const ox = Math.cos(lean) * leanAmt * f * f, oz = Math.sin(lean) * leanAmt * f * f;
+    const ox2 = Math.cos(lean) * leanAmt * f2 * f2, oz2 = Math.sin(lean) * leanAmt * f2 * f2;
+    seg.position.set((ox + ox2) / 2, i * segH + segH / 2, (oz + oz2) / 2);
+    seg.lookAt(ox2, (i + 1) * segH, oz2); seg.rotateX(Math.PI / 2);
+    seg.castShadow = true; g.add(seg);
+    top.set(ox2, (i + 1) * segH, oz2);
+  }
+  const fronds = 8;
+  for (let k = 0; k < fronds; k++) {
+    const fg = new THREE.Group(); fg.rotation.order = 'YXZ';
+    fg.position.copy(top); fg.rotation.y = k / fronds * Math.PI * 2 + rand(-.2, .2); fg.rotation.x = rand(0.15, 0.45);
+    const lm = M.leaves[k % 3];
+    const l1 = box(0.7 * s, 0.08, 1.8 * s, lm); l1.position.z = 0.9 * s; fg.add(l1);
+    const outerG = new THREE.Group(); outerG.position.z = 1.75 * s; outerG.rotation.x = 0.55; fg.add(outerG);
+    const l2 = box(0.5 * s, 0.07, 1.5 * s, lm); l2.position.z = 0.7 * s; outerG.add(l2);
+    g.add(fg);
+  }
+  for (let k = 0; k < 3; k++) {
+    const c = new THREE.Mesh(new THREE.IcosahedronGeometry(0.2 * s, 0), M.coconut);
+    c.position.set(top.x + Math.cos(k * 2.1) * 0.25 * s, top.y - 0.25 * s, top.z + Math.sin(k * 2.1) * 0.25 * s);
+    c.castShadow = true; g.add(c);
+  }
+  scene.add(g);
+  return { x: x + Math.cos(lean) * leanAmt * 0.15, z: z + Math.sin(lean) * leanAmt * 0.15, r: 0.38 * s, h: n * segH };
+}
+function jungleTree(x, z, s) {
+  const g = new THREE.Group(); g.position.set(x, 0, z);
+  const h = 4.6 * s;
+  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.32 * s, 0.55 * s, h, 7), M.trunk);
+  trunk.position.y = h / 2; trunk.castShadow = true; g.add(trunk);
+  for (let k = 0; k < 4; k++) { // roots
+    const r = box(0.25 * s, 0.5 * s, 1.1 * s, M.trunk2);
+    r.rotation.y = k * Math.PI / 2 + 0.4; r.position.set(Math.sin(k * Math.PI / 2 + .4) * .45 * s, .2 * s, Math.cos(k * Math.PI / 2 + .4) * .45 * s);
+    g.add(r);
+  }
+  const blobs = 5;
+  for (let k = 0; k < blobs; k++) {
+    const b = new THREE.Mesh(new THREE.IcosahedronGeometry(rand(1.4, 2.1) * s, 0), M.leaves[(k + 1) % 4]);
+    const a = k / blobs * Math.PI * 2;
+    b.position.set(k ? Math.cos(a) * 1.4 * s : 0, h + (k ? rand(-0.3, 0.6) : 1.2) * s, k ? Math.sin(a) * 1.4 * s : 0);
+    b.rotation.set(rand(0, 3), rand(0, 3), 0);
+    b.castShadow = true; b.receiveShadow = true; g.add(b);
+  }
+  scene.add(g);
+  return { x, z, r: 0.5 * s, h };
+}
+
+function blocked(x, z, pad) {
+  for (const b of boxes) if (b.min.y < 2.5 && x > b.min.x - pad && x < b.max.x + pad && z > b.min.z - pad && z < b.max.z + pad) return true;
+  for (const t of trees) if (Math.hypot(x - t.x, z - t.z) < t.r + pad) return true;
+  return false;
+}
+
+{
+  const r = mulberry32(1337);
+  let placed = 0, tries = 0;
+  while (placed < 24 && tries++ < 2000) {
+    const x = (r() * 2 - 1) * (HALF - 3), z = (r() * 2 - 1) * (HALF - 3);
+    if (Math.hypot(x, z - 28) < 6) continue;
+    if (blocked(x, z, 3)) continue;
+    if (trees.some(t => Math.hypot(t.x - x, t.z - z) < 6)) continue;
+    const s = 0.9 + r() * 0.5;
+    trees.push(r() < 0.6 ? palmTree(x, z, s) : jungleTree(x, z, s));
+    placed++;
+  }
+  // big trees peeking over the walls
+  for (let i = 0; i < 40; i++) {
+    const a = i / 40 * Math.PI * 2, d = HALF + 7 + r() * 14;
+    let x = Math.cos(a) * d, z = Math.sin(a) * d;
+    const mx = Math.max(Math.abs(x), Math.abs(z)), minR = HALF + 5 + r() * 8;
+    if (mx < minR) { x *= minR / mx; z *= minR / mx; }
+    r() < 0.5 ? palmTree(x, z, 1.6 + r() * 0.8) : jungleTree(x, z, 1.8 + r() * 0.8);
+  }
+  // bushes & rocks (decorative, no collision)
+  for (let i = 0; i < 45; i++) {
+    const x = (r() * 2 - 1) * (HALF - 1), z = (r() * 2 - 1) * (HALF - 1);
+    if (blocked(x, z, 0.8)) continue;
+    if (r() < 0.8) {
+      const b = new THREE.Mesh(new THREE.IcosahedronGeometry(0.5 + r() * 0.5, 0), M.leaves[i % 4]);
+      b.scale.y = 0.7; b.position.set(x, 0.25, z); b.castShadow = b.receiveShadow = true; scene.add(b);
+    } else {
+      const b = new THREE.Mesh(new THREE.DodecahedronGeometry(0.3 + r() * 0.4, 0), M.rock);
+      b.position.set(x, 0.15, z); b.rotation.set(r() * 3, r() * 3, 0); b.castShadow = b.receiveShadow = true; scene.add(b);
+    }
+  }
+}
+
+// clouds
+const clouds = [];
+{
+  const cm = new THREE.MeshLambertMaterial({ color: 0xffffff, fog: false });
+  for (let i = 0; i < 14; i++) {
+    const g = new THREE.Group();
+    for (let k = 0; k < 4; k++) { const b = new THREE.Mesh(new THREE.BoxGeometry(rand(6, 12), rand(2, 4), rand(5, 9)), cm); b.position.set(k * 5 - 7, rand(-1, 1), rand(-2, 2)); g.add(b); }
+    g.position.set(rand(-150, 150), rand(45, 70), rand(-150, 150));
+    scene.add(g); clouds.push(g);
+  }
+}
+
+// ============================================================
+//  Collision
+// ============================================================
+function collideWorld(pos, vel, r, h) {
+  let grounded = false;
+  for (const b of boxes) {
+    const minX = pos.x - r, maxX = pos.x + r, minY = pos.y, maxY = pos.y + h, minZ = pos.z - r, maxZ = pos.z + r;
+    if (maxX <= b.min.x || minX >= b.max.x || maxY <= b.min.y || minY >= b.max.y || maxZ <= b.min.z || minZ >= b.max.z) continue;
+    const pxl = maxX - b.min.x, pxr = b.max.x - minX, pyd = maxY - b.min.y, pyu = b.max.y - minY, pzl = maxZ - b.min.z, pzr = b.max.z - minZ;
+    const px = Math.min(pxl, pxr), py = Math.min(pyd, pyu), pz = Math.min(pzl, pzr);
+    if (py <= px && py <= pz) {
+      if (pyu < pyd) { pos.y += pyu; if (vel.y < 0) vel.y = 0; grounded = true; }
+      else { pos.y -= pyd; if (vel.y > 0) vel.y = 0; }
+    } else if (px <= pz) pos.x += pxl < pxr ? -pxl : pxr;
+    else pos.z += pzl < pzr ? -pzl : pzr;
+  }
+  for (const t of trees) {
+    if (pos.y > t.h) continue;
+    const dx = pos.x - t.x, dz = pos.z - t.z, d = Math.hypot(dx, dz), m = r + t.r;
+    if (d < m && d > 1e-4) { pos.x += dx / d * (m - d); pos.z += dz / d * (m - d); }
+  }
+  if (pos.y <= 0) { pos.y = 0; if (vel.y < 0) vel.y = 0; grounded = true; }
+  return grounded;
+}
+
+// ============================================================
+//  Audio (synthesized)
+// ============================================================
+let actx = null, master = null, noiseBuf = null, volMul = 1;
+function initAudio() {
+  if (actx) { if (actx.state === 'suspended') actx.resume(); return; }
+  actx = new (window.AudioContext || window.webkitAudioContext)();
+  master = actx.createGain(); master.gain.value = 0.35 * volMul; master.connect(actx.destination);
+  noiseBuf = actx.createBuffer(1, actx.sampleRate * 0.6, actx.sampleRate);
+  const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+}
+function tone(type, f0, f1, dur, vol, delay = 0) {
+  if (!actx) return;
+  const t = actx.currentTime + delay, o = actx.createOscillator(), g = actx.createGain();
+  o.type = type; o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(Math.max(f1, 1), t + dur);
+  g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(g).connect(master); o.start(t); o.stop(t + dur + 0.02);
+}
+function noise(dur, vol, freq, delay = 0) {
+  if (!actx) return;
+  const t = actx.currentTime + delay, s = actx.createBufferSource(), f = actx.createBiquadFilter(), g = actx.createGain();
+  s.buffer = noiseBuf; f.type = 'lowpass'; f.frequency.value = freq;
+  g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  s.connect(f).connect(g).connect(master); s.start(t); s.stop(t + dur + 0.02);
+}
+const sfx = {
+  pistol() { tone('square', 750, 160, 0.09, 0.12); noise(0.08, 0.3, 3500); },
+  shotgun() { noise(0.3, 0.6, 1400); tone('sine', 140, 40, 0.22, 0.5); },
+  sniper() { noise(0.45, 0.55, 2800); tone('sawtooth', 320, 50, 0.3, 0.15); tone('sine', 95, 30, 0.45, 0.6); },
+  hit() { tone('triangle', 1150, 950, 0.06, 0.22); },
+  head() { tone('triangle', 1500, 1350, 0.07, 0.25); tone('triangle', 2100, 1900, 0.09, 0.15, 0.04); },
+  kill() { [660, 880, 1320].forEach((f, i) => tone('square', f, f, 0.1, 0.08, i * 0.07)); },
+  hurt() { tone('sawtooth', 220, 70, 0.22, 0.2); },
+  reload() { noise(0.04, 0.3, 5000); noise(0.05, 0.35, 4000, 0.25); },
+  empty() { tone('square', 1800, 1800, 0.03, 0.05); },
+  monkey() { tone('square', 520, 950, 0.1, 0.05); tone('square', 950, 600, 0.12, 0.05, 0.11); },
+  swap() { noise(0.05, 0.15, 3000); },
+  roar() { tone('sawtooth', 160, 55, 0.7, 0.22); tone('square', 110, 40, 0.8, 0.1, 0.05); noise(0.6, 0.25, 600); },
+  slam() { noise(0.5, 0.7, 500); tone('sine', 90, 25, 0.6, 0.8); },
+  enemyShot(v) { tone('square', 520, 130, 0.09, 0.07 * v); noise(0.07, 0.18 * v, 2600); },
+  heal() { [520, 660, 880].forEach((f, i) => tone('sine', f, f * 1.05, 0.12, 0.14, i * 0.06)); },
+  pickup() { tone('triangle', 660, 990, 0.08, 0.15); tone('triangle', 990, 1320, 0.1, 0.12, 0.07); },
+  crate() { noise(0.25, 0.5, 1800); tone('square', 180, 70, 0.15, 0.12); },
+  wave() { [440, 554, 659].forEach((f, i) => tone('square', f, f, 0.14, 0.08, i * 0.1)); },
+  win() { [523, 659, 784, 1046].forEach((f, i) => tone('square', f, f, i === 3 ? 0.4 : 0.14, 0.09, i * 0.12)); },
+};
+
+// ============================================================
+//  Weapons
+// ============================================================
+const WEAPONS = [
+  { name: 'Banana Pistol', icon: '🍌', dmg: 60, pellets: 1, spread: 0.006, rate: 0.26, mag: 12, reload: 1.3, speed: 80, grav: 3, life: 1.6,
+    headMult: 1.5, camKick: 0.012, kickZ: 0.06, kickRot: 0.18, scale: 1, sound: 'pistol', vmPos: new V3(0.24, -0.22, -0.48), gap: 7 },
+  { name: 'Banana Shotgun', icon: '🍌🍌', dmg: 22, pellets: 9, spread: 0.075, rate: 0.85, mag: 6, reload: 2.0, speed: 55, grav: 8, life: 0.55,
+    headMult: 1.5, camKick: 0.035, kickZ: 0.14, kickRot: 0.35, scale: 0.6, sound: 'shotgun', vmPos: new V3(0.24, -0.24, -0.45), gap: 26 },
+  { name: 'Banana Sniper', icon: '🍌🎯', dmg: 160, pellets: 1, spread: 0.035, rate: 1.3, mag: 5, reload: 2.3, speed: 240, grav: 0.4, life: 1.5,
+    headMult: 2, camKick: 0.05, kickZ: 0.18, kickRot: 0.25, scale: 1.3, sound: 'sniper', vmPos: new V3(0.22, -0.2, -0.38), gap: 14, scope: true },
+];
+// Pistol: 300 / 60 = 5 shots. Shotgun: 9 x 22 = 198 per blast -> 2 blasts. Sniper: 160 -> 2 body shots, or 1 headshot (320).
+
+const vm = new THREE.Group(); camera.add(vm);
+function buildGun(i) {
+  const g = new THREE.Group();
+  const muzzle = new THREE.Object3D();
+  if (i === 0) {
+    const grip = box(0.08, 0.2, 0.1, M.wood); grip.position.set(0, -0.11, 0.07); grip.rotation.x = 0.25;
+    const frame = box(0.1, 0.08, 0.26, M.dark); frame.position.set(0, 0.0, -0.03);
+    const guard = box(0.02, 0.06, 0.08, M.dark); guard.position.set(0, -0.06, -0.01);
+    const ban = makeBanana(0.36, 0.055, 0.09); ban.position.set(0, 0.075, -0.1);
+    g.add(grip, frame, guard, ban); muzzle.position.set(0, 0.08, -0.33);
+  } else if (i === 1) {
+    const stock = box(0.1, 0.13, 0.34, M.wood); stock.position.set(0, -0.05, 0.2);
+    const body = box(0.15, 0.13, 0.26, M.dark); body.position.set(0, 0, -0.06);
+    const b1 = makeBanana(0.62, 0.05, 0.08); b1.position.set(-0.05, 0.07, -0.42);
+    const b2 = makeBanana(0.62, 0.05, 0.08); b2.position.set(0.05, 0.07, -0.42);
+    const pump = box(0.17, 0.07, 0.17, M.wood); pump.position.set(0, -0.015, -0.36);
+    g.add(stock, body, b1, b2, pump); muzzle.position.set(0, 0.08, -0.78);
+  } else {
+    const stock = box(0.08, 0.15, 0.4, M.wood); stock.position.set(0, -0.06, 0.24);
+    const body = box(0.1, 0.11, 0.36, M.dark); body.position.set(0, 0, -0.05);
+    const ban = makeBanana(1.0, 0.045, 0.06); ban.position.set(0, 0.035, -0.68);
+    const scope = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.32, 10), M.dark); scope.rotation.x = Math.PI / 2; scope.position.set(0, 0.12, -0.06);
+    const lens = new THREE.Mesh(new THREE.CircleGeometry(0.036, 12), M.lens); lens.position.set(0, 0.12, -0.221);  lens.rotation.y = Math.PI;
+    const mount = box(0.03, 0.06, 0.08, M.dark); mount.position.set(0, 0.07, -0.06);
+    g.add(stock, body, ban, scope, lens, mount); muzzle.position.set(0, 0.035, -1.22);
+  }
+  const flash = new THREE.Mesh(new THREE.IcosahedronGeometry(0.07, 0), new THREE.MeshBasicMaterial({ color: 0xfff27a }));
+  flash.visible = false; muzzle.add(flash);
+  g.add(muzzle);
+  g.userData = { muzzle, flash };
+  g.traverse(o => { o.layers.set(1); o.castShadow = false; o.receiveShadow = false; });
+  g.visible = false;
+  vm.add(g);
+  return g;
+}
+const guns = WEAPONS.map((_, i) => buildGun(i));
+const ammoState = WEAPONS.map(w => ({ ammo: w.mag, reloading: false, reloadStart: 0, reloadEnd: 0 }));
+
+// ============================================================
+//  Player
+// ============================================================
+const SPAWN = new V3(0, 0, 28);
+const player = { pos: SPAWN.clone(), vel: new V3(), yaw: 0, pitch: 0, onGround: false, hp: 100, maxHp: 100, stamina: 10, maxStamina: 10, exhausted: false, lastSprint: -99, lastHurt: -99, dead: false, eye: 1.6 };
+let cur = 0, lastWeapon = 1, nextFire = 0, swapT = 0, recoil = 0, flashT = 0, hurtFlash = 0, shake = 0, kills = 0, deathT = 0;
+let swayX = 0, swayY = 0, bobPhase = 0;
+let time = 0;
+
+function switchTo(i) {
+  if (i === cur || player.dead) return;
+  ammoState[cur].reloading = false;
+  lastWeapon = cur; cur = i; swapT = 0.28;
+  nextFire = Math.max(nextFire, time + 0.2);
+  sfx.swap(); refreshSlots();
+}
+function startReload() {
+  const s = ammoState[cur], w = WEAPONS[cur];
+  if (s.reloading || s.ammo === w.mag || s.reserve <= 0 || player.dead) return;
+  s.reloading = true; s.reloadStart = time; s.reloadEnd = time + w.reload; sfx.reload();
+}
+
+// ============================================================
+//  Projectiles, particles
+// ============================================================
+const projectiles = [];
+const projProto = WEAPONS.map(w => makeBanana(0.34 * w.scale, 0.06 * w.scale, 0.09 * w.scale));
+const _o = new V3(), _d = new V3(), _m = new V3(), _r = new V3(), _u = new V3(), _seg = new V3(), _pt = new V3(), _tmp = new V3();
+const _ray = new THREE.Ray(), _sph = new THREE.Sphere();
+
+function fire() {
+  const w = WEAPONS[cur];
+  camera.getWorldPosition(_o); camera.getWorldDirection(_d);
+  const scoped = w.scope && zoom > 0.7;
+  const gun = guns[cur];
+  gun.userData.muzzle.getWorldPosition(_m);
+  const offset = scoped ? new V3(0, -0.15, 0) : _m.clone().sub(_o);
+  _r.crossVectors(_d, camera.up).normalize(); _u.crossVectors(_r, _d).normalize();
+  const spread = scoped ? 0 : w.spread * (aimHeld ? 0.6 : 1);
+  for (let i = 0; i < w.pellets; i++) {
+    const a = Math.random() * Math.PI * 2, rr = spread * Math.sqrt(Math.random());
+    const dir = _d.clone().addScaledVector(_r, Math.cos(a) * rr).addScaledVector(_u, Math.sin(a) * rr).normalize();
+    const mesh = projProto[cur].clone();
+    mesh.rotation.set(rand(0, 6), rand(0, 6), 0);
+    scene.add(mesh);
+    projectiles.push({ pos: _o.clone().addScaledVector(dir, 0.2), vel: dir.multiplyScalar(w.speed * rand(0.95, 1.05)), w, dmg: w.dmg * dmgMul(cur), age: 0, mesh, off: offset.clone(), spin: rand(12, 22) });
+  }
+  recoil = 1; flashT = 0.05;
+  player.pitch = clamp(player.pitch + w.camKick, -1.5, 1.5);
+  player.yaw += rand(-1, 1) * w.camKick * 0.3;
+  sfx[w.sound]();
+}
+
+function traceSegment(p0, seg, len, skipMonkeys = false) {
+  _ray.origin.copy(p0); _ray.direction.copy(seg).divideScalar(len);
+  let best = len, res = null;
+  for (const m of skipMonkeys ? [] : monkeys) {
+    if (m.dead) continue;
+    if (Math.hypot(m.pos.x - p0.x, m.pos.z - p0.z) > len + 3 * m.scale) continue;
+    for (const z of HIT_ZONES) {
+      _sph.center.set(m.pos.x, m.pos.y + z.y * m.scale, m.pos.z); _sph.radius = z.r * m.scale + 0.07;
+      if (_ray.intersectSphere(_sph, _pt)) {
+        const d = _pt.distanceTo(p0);
+        if (d <= best) { best = d; res = { monkey: m, head: z.head, point: _pt.clone() }; }
+      }
+    }
+  }
+  for (const b of boxes) {
+    if (_ray.intersectBox(b, _pt)) {
+      const d = _pt.distanceTo(p0);
+      if (d <= best) { best = d; res = { point: _pt.clone(), supply: b.supply }; }
+    }
+  }
+  const a = seg.x * seg.x + seg.z * seg.z;
+  if (a > 1e-9) for (const t of trees) {
+    const fx = p0.x - t.x, fz = p0.z - t.z;
+    const b = 2 * (fx * seg.x + fz * seg.z), c = fx * fx + fz * fz - t.r * t.r;
+    const disc = b * b - 4 * a * c; if (disc < 0) continue;
+    let tt = c < 0 ? 0 : (-b - Math.sqrt(disc)) / (2 * a);
+    if (tt < 0 || tt > 1) continue;
+    if (p0.y + seg.y * tt > t.h) continue;
+    const d = tt * len;
+    if (d <= best) { best = d; res = { point: p0.clone().addScaledVector(seg, tt) }; }
+  }
+  if (p0.y + seg.y < 0 && seg.y < 0) {
+    const tt = p0.y / -seg.y, d = tt * len;
+    if (d <= best) { best = d; res = { point: p0.clone().addScaledVector(seg, tt) }; }
+  }
+  return res;
+}
+
+function updateProjectiles(dt) {
+  for (let i = projectiles.length - 1; i >= 0; i--) {
+    const p = projectiles[i];
+    p.age += dt;
+    let remove = p.age > p.w.life;
+    if (!remove) {
+      p.vel.y -= p.w.grav * dt;
+      _seg.copy(p.vel).multiplyScalar(dt);
+      const hit = traceSegment(p.pos, _seg, _seg.length());
+      if (hit) {
+        remove = true;
+        if (hit.monkey) damageMonkey(hit.monkey, p.dmg * (hit.head ? p.w.headMult : 1), hit.head, hit.point);
+        else { burst(hit.point, 0xffd93b, 5, 3); if (hit.supply) breakSupply(hit.supply); }
+      } else p.pos.add(_seg);
+    }
+    if (remove) { scene.remove(p.mesh); projectiles.splice(i, 1); continue; }
+    const k = Math.max(0, 1 - p.age / 0.12);
+    p.mesh.position.copy(p.pos).addScaledVector(p.off, k);
+    p.mesh.rotation.x += p.spin * dt; p.mesh.rotation.y += p.spin * 0.3 * dt;
+  }
+}
+
+// ---------- hunter monkey bananas ----------
+const enemyShots = [];
+const _hm = new V3(), _es = new V3(), _ed = new V3();
+function hasLineOfSight(m) {
+  _hm.set(m.pos.x, m.pos.y + 1.9 * m.scale, m.pos.z);
+  _es.set(player.pos.x, player.pos.y + 1.5, player.pos.z).sub(_hm);
+  const len = _es.length();
+  return !traceSegment(_hm, _es, len, true);
+}
+function hunterShoot(m) {
+  m.group.updateMatrixWorld(true);
+  const o = m.arms[1].localToWorld(new V3(0, -1.5, 0.12));
+  const dir = new V3(player.pos.x, player.pos.y + 1.1, player.pos.z).sub(o).normalize();
+  const sp = 0.035;
+  dir.x += rand(-sp, sp); dir.y += rand(-sp, sp) * 0.6; dir.z += rand(-sp, sp); dir.normalize();
+  const mesh = projProto[0].clone(); mesh.position.copy(o); scene.add(mesh);
+  enemyShots.push({ pos: o, vel: dir.multiplyScalar(36), dmg: m.shotDmg, age: 0, mesh, spin: rand(12, 20) });
+  burst(o, 0xfff27a, 3, 2);
+  sfx.enemyShot(clamp(1.3 - Math.hypot(player.pos.x - m.pos.x, player.pos.z - m.pos.z) / 30, 0.25, 1));
+}
+function updateEnemyShots(dt) {
+  for (let i = enemyShots.length - 1; i >= 0; i--) {
+    const p = enemyShots[i];
+    p.age += dt;
+    let remove = p.age > 1.4;
+    if (!remove) {
+      _seg.copy(p.vel).multiplyScalar(dt);
+      const len = _seg.length();
+      const wall = traceSegment(p.pos, _seg, len, true);
+      const wallD = wall ? wall.point.distanceTo(p.pos) : Infinity;
+      let hitPlayer = false;
+      if (!player.dead) {
+        _ray.origin.copy(p.pos); _ray.direction.copy(_seg).divideScalar(len);
+        for (const [y, r] of [[0.9, 0.55], [1.55, 0.35]]) {
+          _sph.center.set(player.pos.x, player.pos.y + y, player.pos.z); _sph.radius = r;
+          if (_ray.intersectSphere(_sph, _ed)) { const d = _ed.distanceTo(p.pos); if (d <= len && d < wallD) hitPlayer = true; }
+        }
+      }
+      if (hitPlayer) { damagePlayer(p.dmg); burst(p.pos, 0xffd93b, 4, 3); remove = true; }
+      else if (wall) { burst(wall.point, 0xffd93b, 4, 3); remove = true; }
+      else p.pos.add(_seg);
+    }
+    if (remove) { scene.remove(p.mesh); enemyShots.splice(i, 1); continue; }
+    p.mesh.position.copy(p.pos);
+    p.mesh.rotation.x += p.spin * dt; p.mesh.rotation.y += p.spin * 0.3 * dt;
+  }
+}
+
+const particles = [];
+const partGeo = new THREE.BoxGeometry(0.12, 0.12, 0.12);
+const partMats = new Map();
+function burst(pos, color, n, speed) {
+  if (!partMats.has(color)) partMats.set(color, new THREE.MeshBasicMaterial({ color }));
+  for (let i = 0; i < n && particles.length < 300; i++) {
+    const mesh = new THREE.Mesh(partGeo, partMats.get(color));
+    mesh.position.copy(pos);
+    scene.add(mesh);
+    const life = rand(0.35, 0.7);
+    particles.push({ mesh, vel: new V3(rand(-1, 1), rand(0.3, 1.5), rand(-1, 1)).multiplyScalar(speed), life, max: life });
+  }
+}
+function updateParticles(dt) {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.life -= dt;
+    if (p.life <= 0) { scene.remove(p.mesh); particles.splice(i, 1); continue; }
+    p.vel.y -= 15 * dt;
+    p.mesh.position.addScaledVector(p.vel, dt);
+    if (p.mesh.position.y < 0.06) { p.mesh.position.y = 0.06; p.vel.multiplyScalar(0.5); p.vel.y *= -0.4; }
+    p.mesh.scale.setScalar(p.life / p.max);
+    p.mesh.rotation.x += dt * 8;
+  }
+}
+
+// ============================================================
+//  Monkeys
+// ============================================================
+const MONKEY_HP = 300;
+const POOL_SIZE = 14;
+// Each wave: total monkeys, max alive at once, HP multiplier, chase speed, punch damage, punch cooldown, fur tint.
+// mix = how many hunters / brutes are in the wave (the rest are normal monkeys). shot = hunter banana damage.
+const WAVES = [
+  { count: 5,  alive: 4, hp: 1.0,  speed: 4.0, dmg: 10, cd: 1.25, shot: 6, fur: 0x7a4a24, mix: { hunter: 0, brute: 0 } },
+  { count: 8,  alive: 5, hp: 1.1,  speed: 4.4, dmg: 12, cd: 1.15, shot: 6, fur: 0x8a5426, mix: { hunter: 2, brute: 0 } },
+  { count: 11, alive: 6, hp: 1.25, speed: 4.8, dmg: 13, cd: 1.05, shot: 7, fur: 0x9a4a22, mix: { hunter: 3, brute: 2 } },
+  { count: 14, alive: 7, hp: 1.4,  speed: 5.3, dmg: 15, cd: 0.95, shot: 8, fur: 0x5e3a1c, mix: { hunter: 4, brute: 4 } },
+  { count: 18, alive: 8, hp: 1.6,  speed: 5.8, dmg: 17, cd: 0.9,  shot: 9, fur: 0x3e2a18, mix: { hunter: 6, brute: 6 } },
+];
+// Monkey kinds. Numbers multiply the wave's base stats.
+const TYPES = {
+  normal: { name: 'Monkey',        plural: 'monkeys', hp: 1,   speed: 1,    dmg: 1,   scale: 1,    ko: 'MONKEY BONKED!' },
+  hunter: { name: 'Hunter Monkey', plural: 'hunters', hp: 0.8, speed: 0.95, dmg: 0.6, scale: 1,    ko: 'HUNTER BONKED!', fur: 0x6e5c3a },
+  brute:  { name: 'Brute Monkey',  plural: 'brutes',  hp: 2.3, speed: 1.3,  dmg: 1.7, scale: 1.35, ko: 'BRUTE BONKED!',  fur: 0x4a1f14 },
+};
+// Difficulty, picked after pressing PLAY. Multiplies every monkey's (and the boss's) stats.
+const DIFFICULTY = {
+  normal: { name: 'Normal', hp: 1,   dmg: 1,   speed: 1,    drops: 1 },
+  hard:   { name: 'Hard',   hp: 1.5, dmg: 1.4, speed: 1.15, drops: 0.7 },   // 50% more health, 40% harder hits, 15% faster, 30% fewer drops
+};
+let difficulty = 'normal';
+const D = () => DIFFICULTY[difficulty];
+// Hard mode keeps going after wave 5: five more waves before the boss.
+const HARD_EXTRA_WAVES = [
+  { count: 20, alive: 8,  hp: 1.7, speed: 6.0, dmg: 18, cd: 0.88, shot: 9,  fur: 0x4a2c16, mix: { hunter: 7,  brute: 7 } },
+  { count: 22, alive: 9,  hp: 1.8, speed: 6.2, dmg: 19, cd: 0.85, shot: 10, fur: 0x3a2414, mix: { hunter: 8,  brute: 8 } },
+  { count: 24, alive: 9,  hp: 1.9, speed: 6.3, dmg: 20, cd: 0.82, shot: 10, fur: 0x2e1e12, mix: { hunter: 9,  brute: 9 } },
+  { count: 26, alive: 10, hp: 2.0, speed: 6.4, dmg: 21, cd: 0.8,  shot: 11, fur: 0x26180f, mix: { hunter: 10, brute: 10 } },
+  { count: 30, alive: 10, hp: 2.2, speed: 6.5, dmg: 22, cd: 0.78, shot: 12, fur: 0x1e130c, mix: { hunter: 12, brute: 12 } },
+];
+const waves = () => difficulty === 'hard' ? WAVES.concat(HARD_EXTRA_WAVES) : WAVES;   // 5 waves on Normal, 10 on Hard
+const monkeyCfg = (w, type = 'normal') => {
+  const t = TYPES[type], d = D();
+  return { type, hp: MONKEY_HP * w.hp * t.hp * d.hp, speed: Math.min(w.speed * t.speed, 7.4) * d.speed, dmg: Math.round(w.dmg * t.dmg * d.dmg), cd: w.cd,
+           fur: t.fur ?? w.fur, scale: t.scale, shotDmg: Math.round(w.shot * d.dmg) };
+};
+// Boss: 5000 HP = ~84 pistol body shots, ~26 close shotgun blasts, or ~16 sniper headshots.
+// Speeds are 25% faster and punch/slam damage 15% stronger than the first version (was speed 3.4 / 4.8, damage 28 / 24).
+const BOSS = { name: 'THE BANANA KING', hp: 5000, scale: 3, speed: 3.4 * 1.25, enragedSpeed: 4.8 * 1.25, dmg: Math.round(28 * 1.15), cd: 1.6, slamDmg: Math.round(24 * 1.15), slamRadius: 9 };
+const HIT_ZONES = [
+  { y: 1.95, r: 0.46, head: true },
+  { y: 1.15, r: 0.58, head: false },
+  { y: 0.45, r: 0.42, head: false },
+];
+const monkeys = [];
+const barBgGeo = new THREE.PlaneGeometry(1.3, 0.2);
+const barFgGeo = new THREE.PlaneGeometry(1.22, 0.12); barFgGeo.translate(0.61, 0, 0);
+const barBgMat = new THREE.MeshBasicMaterial({ color: 0x111111, fog: false, transparent: true, opacity: 0.85 });
+
+function buildMonkey(isBoss = false) {
+  const fur = mat(isBoss ? 0x3b2618 : 0x7a4a24), skin = mat(isBoss ? 0xc99868 : 0xe8b583), darkM = mat(0x1a1a1a), white = mat(0xffffff), brow = mat(0x3d2410);
+  const pupil = isBoss ? mat(0xff2a2a, { emissive: 0xff0000, emissiveIntensity: 0.8 }) : darkM;
+  const g = new THREE.Group(); g.rotation.order = 'YXZ';
+  const add = (w, h, d, m, x, y, z, parent = g) => { const b = box(w, h, d, m); b.position.set(x, y, z); parent.add(b); return b; };
+  add(0.9, 1.0, 0.62, fur, 0, 1.15, 0);             // body
+  add(0.62, 0.72, 0.06, skin, 0, 1.12, 0.32);        // belly
+  const head = new THREE.Group(); head.position.set(0, 1.95, 0); g.add(head);
+  add(0.82, 0.72, 0.72, fur, 0, 0, 0, head);
+  add(0.64, 0.46, 0.06, skin, 0, -0.04, 0.37, head); // face
+  add(0.42, 0.22, 0.16, skin, 0, -0.17, 0.44, head); // muzzle
+  add(0.2, 0.04, 0.03, darkM, 0, -0.2, 0.53, head);  // mouth
+  for (const s of [-1, 1]) {
+    add(0.16, 0.14, 0.03, white, s * 0.15, 0.06, 0.41, head);
+    add(0.08, 0.1, 0.03, pupil, s * 0.13, 0.05, 0.43, head);
+    const b = add(0.22, 0.06, 0.04, brow, s * 0.15, 0.17, 0.42, head); b.rotation.z = s * -0.35; // angry brows
+    add(0.12, 0.28, 0.24, fur, s * 0.47, 0.02, 0, head);   // ears
+    add(0.04, 0.18, 0.15, skin, s * 0.535, 0.02, 0, head);
+  }
+  if (isBoss) {
+    const gold = mat(0xffc531, { roughness: 0.35, metalness: 0.6 }), gem = mat(0xff3355, { emissive: 0xaa0022, emissiveIntensity: 0.6 });
+    add(0.7, 0.16, 0.7, gold, 0, 0.44, 0, head);                       // crown band
+    for (const [x, z] of [[-0.28, -0.28], [0.28, -0.28], [-0.28, 0.28], [0.28, 0.28], [0, 0.28], [0, -0.28], [-0.28, 0], [0.28, 0]])
+      add(0.13, 0.2, 0.13, gold, x, 0.6, z, head);                      // crown points
+    add(0.14, 0.12, 0.04, gem, 0, 0.44, 0.36, head);                   // crown gem
+    add(0.94, 0.12, 0.66, gold, 0, 0.72, 0);                           // golden belt
+    add(0.18, 0.14, 0.04, gem, 0, 0.72, 0.34);
+  }
+  const arms = [], legs = [];
+  for (const s of [-1, 1]) {
+    const a = new THREE.Group(); a.position.set(s * 0.58, 1.55, 0); g.add(a);
+    add(0.26, 0.95, 0.26, fur, 0, -0.45, 0, a); add(0.28, 0.2, 0.28, skin, 0, -0.95, 0, a);
+    arms.push(a);
+    const l = new THREE.Group(); l.position.set(s * 0.24, 0.65, 0); g.add(l);
+    add(0.3, 0.6, 0.3, fur, 0, -0.3, 0, l); add(0.32, 0.12, 0.4, skin, 0, -0.6, 0.05, l);
+    legs.push(l);
+  }
+  // optional gear, switched on per monkey type
+  const gear = { hunter: [], brute: [] };
+  if (!isBoss) {
+    const green = mat(0x2f8f3a), gunDark = mat(0x353a46, { roughness: 0.45, metalness: 0.4 }), metal = mat(0x7b8494, { roughness: 0.4, metalness: 0.5 }), red = mat(0xc62828), black = mat(0x222222);
+    // hunter: green bandana + banana pistol in the right hand
+    const hb = new THREE.Group(); head.add(hb);
+    add(0.86, 0.14, 0.76, green, 0, 0.22, 0, hb);
+    add(0.14, 0.14, 0.1, green, 0, 0.18, -0.42, hb);
+    const tie = add(0.08, 0.26, 0.05, green, 0.07, 0.04, -0.45, hb); tie.rotation.z = 0.4;
+    const hg = new THREE.Group(); arms[1].add(hg);
+    add(0.1, 0.12, 0.22, gunDark, 0, -1.04, 0.1, hg);
+    const ban = makeBanana(0.42, 0.06, 0.08); ban.rotation.x = Math.PI / 2; ban.position.set(0, -1.28, 0.12); hg.add(ban);
+    gear.hunter.push(hb, hg);
+    // brute: spiked shoulder pads, wristbands, red headband, chest strap
+    for (const a of arms) {
+      const pad = new THREE.Group(); a.add(pad);
+      add(0.44, 0.2, 0.44, metal, 0, 0.06, 0, pad); add(0.1, 0.2, 0.1, metal, 0, 0.25, 0, pad);
+      add(0.32, 0.1, 0.32, black, 0, -0.78, 0, pad);
+      gear.brute.push(pad);
+    }
+    const rb = new THREE.Group(); head.add(rb); add(0.86, 0.12, 0.76, red, 0, 0.24, 0, rb);
+    const sg = new THREE.Group(); g.add(sg); const strap = add(0.16, 1.25, 0.68, black, 0, 1.15, 0, sg); strap.rotation.z = 0.7;
+    gear.brute.push(rb, sg);
+    for (const p of [...gear.hunter, ...gear.brute]) p.visible = false;
+  }
+  const tail = new THREE.Group(); tail.position.set(0, 0.8, -0.3); g.add(tail);
+  let tp = tail;
+  for (let i = 0; i < 4; i++) { const seg = new THREE.Group(); seg.position.z = i ? -0.28 : 0; seg.rotation.x = -0.35; tp.add(seg); add(0.12, 0.12, 0.3, fur, 0, 0, -0.15, seg); tp = seg; }
+
+  const bar = new THREE.Group();
+  const bg = new THREE.Mesh(barBgGeo, barBgMat);
+  const fgMat = new THREE.MeshBasicMaterial({ color: 0x4cff4c, fog: false });
+  const fg = new THREE.Mesh(barFgGeo, fgMat); fg.position.set(-0.61, 0, 0.002);
+  bar.add(bg, fg); scene.add(bar);
+
+  g.visible = false; bar.visible = false;
+  scene.add(g);
+  return { group: g, head, arms, legs, tail, bar, fg, fgMat, mats: [fur, skin], pos: new V3(), vel: new V3(), hp: MONKEY_HP, maxHp: MONKEY_HP,
+           speed: 4.6, dmg: 12, cd: 1.1, isBoss, active: false, gear, type: isBoss ? 'boss' : 'normal', shotDmg: 6, shootCd: 2, burstLeft: 3, los: false, losT: 0, aim: 0, strafe: 1, strafeT: 1, slamCd: 4, slamming: false, enraged: false, summons: 0,
+           dead: true, deadT: 0, aggro: 0, attackCd: 0.5, punchT: 0, flash: 0, phase: rand(0, 6), wp: null, wpT: 0,
+           stuckT: 0, steer: 1, grounded: true, scale: isBoss ? BOSS.scale : 1, spawnT: 1, dmgNum: null, yaw: 0, chatter: rand(2, 6) };
+}
+
+function freeSpot(minDist, pad = 1) {
+  for (let i = 0; i < 80; i++) {
+    const x = rand(-HALF + 3, HALF - 3), z = rand(-HALF + 3, HALF - 3);
+    if (Math.hypot(x - player.pos.x, z - player.pos.z) < minDist) continue;
+    if (blocked(x, z, pad)) continue;
+    return { x, z };
+  }
+  return { x: 0, z: -28 };
+}
+function activateMonkey(m, cfg, near = null) {
+  const s = near || freeSpot(m.isBoss ? 18 : 20, m.isBoss ? 2.5 : 1);
+  m.pos.set(s.x, m.isBoss ? 20 : 0, s.z); m.vel.set(0, 0, 0);
+  m.maxHp = m.hp = cfg.hp; m.speed = cfg.speed; m.dmg = cfg.dmg; m.cd = cfg.cd;
+  if (!m.isBoss) {
+    m.type = cfg.type || 'normal'; m.scale = cfg.scale || 1; m.shotDmg = cfg.shotDmg || 6;
+    for (const k in m.gear) for (const p of m.gear[k]) p.visible = k === m.type;
+    m.shootCd = rand(1.2, 2.2); m.burstLeft = 3; m.los = false; m.losT = 0; m.strafe = Math.random() < 0.5 ? -1 : 1; m.strafeT = rand(1, 2.5);
+  }
+  if (cfg.fur) m.mats[0].color.setHex(cfg.fur);
+  m.active = true; m.dead = false; m.deadT = 0; m.aggro = cfg.aggro ?? 999; m.wp = null; m.stuckT = 0; m.attackCd = 0.5;
+  m.spawnT = m.isBoss ? 1 : 0; m.slamCd = 5; m.slamming = m.isBoss; m.enraged = false; m.summons = 0; m.drops = 0; m.medDrops = 0; m.grounded = false;
+  m.group.rotation.set(0, rand(0, 6), 0); m.yaw = m.group.rotation.y;
+  m.group.visible = true; m.bar.visible = !m.isBoss;
+}
+function deactivateMonkey(m) { m.active = false; m.dead = true; m.group.visible = false; m.bar.visible = false; }
+
+for (let i = 0; i < POOL_SIZE; i++) monkeys.push(buildMonkey());
+const boss = buildMonkey(true); monkeys.push(boss);
+// a few monkeys wander around behind the title screen
+for (let i = 0; i < 5; i++) activateMonkey(monkeys[i], { ...monkeyCfg(WAVES[0]), aggro: 0 });
+
+// ---------- shockwave rings (boss ground slam) ----------
+const rings = [];
+const ringGeo = new THREE.RingGeometry(0.82, 1, 48); ringGeo.rotateX(-Math.PI / 2);
+function shockwave(pos, radius) {
+  const mtl = new THREE.MeshBasicMaterial({ color: 0xfff1a8, transparent: true, opacity: 0.9, side: THREE.DoubleSide, depthWrite: false });
+  const mesh = new THREE.Mesh(ringGeo, mtl); mesh.position.set(pos.x, pos.y + 0.12, pos.z);
+  scene.add(mesh); rings.push({ mesh, t: 0, radius });
+}
+function updateRings(dt) {
+  for (let i = rings.length - 1; i >= 0; i--) {
+    const r = rings[i]; r.t += dt;
+    const p = r.t / 0.45;
+    if (p >= 1) { scene.remove(r.mesh); r.mesh.material.dispose(); rings.splice(i, 1); continue; }
+    r.mesh.scale.setScalar(0.5 + p * r.radius);
+    r.mesh.material.opacity = 0.9 * (1 - p);
+  }
+}
+function bossSlam(m) {
+  m.slamming = false;
+  shockwave(m.pos, BOSS.slamRadius);
+  burst(m.pos.clone().setY(m.pos.y + 0.3), 0xc9a36b, 24, 9);
+  sfx.slam();
+  const d = Math.hypot(player.pos.x - m.pos.x, player.pos.z - m.pos.z);
+  shake = Math.max(shake, 0.6 * Math.max(0.3, 1 - d / 30));
+  if (!player.dead && player.onGround && d < BOSS.slamRadius && Math.abs(player.pos.y - m.pos.y) < 1.5) {
+    damagePlayer(Math.round(BOSS.slamDmg * D().dmg * (1 - 0.5 * d / BOSS.slamRadius)));
+    const nx = (player.pos.x - m.pos.x) / (d || 1), nz = (player.pos.z - m.pos.z) / (d || 1);
+    player.vel.x += nx * 11; player.vel.z += nz * 11; player.vel.y = 7; player.onGround = false;
+  }
+}
+function summonMinions(types) {
+  const w = WAVES[2];
+  for (const type of types) {
+    const m = monkeys.find(o => !o.active && !o.isBoss);
+    if (!m) return;
+    const a = rand(0, Math.PI * 2);
+    let x = boss.pos.x + Math.cos(a) * 4, z = boss.pos.z + Math.sin(a) * 4;
+    if (blocked(x, z, 1)) ({ x, z } = freeSpot(12));
+    activateMonkey(m, monkeyCfg(w, type), { x: clamp(x, -HALF + 2, HALF - 2), z: clamp(z, -HALF + 2, HALF - 2) });
+    burst(m.pos.clone().setY(1), 0x7a4a24, 8, 4);
+  }
+  sfx.monkey();
+}
+
+function damageMonkey(m, dmg, head, point) {
+  if (m.dead) return;
+  m.hp -= dmg; m.flash = 0.12; m.aggro = Math.max(m.aggro, 8);
+  burst(point, 0xffd93b, head ? 8 : 5, 4);
+  showDamage(m, dmg, head);
+  const killed = m.hp <= 0;
+  hitmark(killed ? 'kill' : head ? 'head' : '');
+  head ? sfx.head() : sfx.hit();
+  if (m.isBoss && !killed) {
+    const f = m.hp / m.maxHp;
+    while (m.drops < 9 && f < 1 - 0.1 * (m.drops + 1)) { m.drops++; bossAmmoDrop(m); }
+    while (m.medDrops < 3 && f < 1 - 0.25 * (m.medDrops + 1)) { m.medDrops++; bossAmmoDrop(m, 'med'); }
+    if ((m.summons < 1 && f < 0.66) || (m.summons < 2 && f < 0.33)) { m.summons++; summonMinions(m.summons === 1 ? ['normal', 'normal', 'hunter'] : ['brute', 'hunter', 'hunter']); banner('MINIONS!', 'The King called for backup!', 2.2); }
+    if (!m.enraged && f < 0.5) { m.enraged = true; m.speed = BOSS.enragedSpeed * D().speed; m.cd = 1.1; m.slamCd = Math.min(m.slamCd, 1); sfx.roar(); }
+  }
+  if (killed) {
+    m.hp = 0; m.dead = true; m.deadT = 0; m.bar.visible = false;
+    kills++; document.getElementById('kills').textContent = kills;
+    addKOs(m.isBoss ? BOSS_KO_VALUE : 1);   // KOs are also the upgrade currency
+    sfx.kill();
+    burst(m.pos.clone().setY(1.4 * m.scale), m.isBoss ? 0xffc531 : 0x7a4a24, m.isBoss ? 60 : 14, m.isBoss ? 12 : 6);
+    const ko = document.getElementById('ko');
+    if (m.isBoss) {
+      feed(`<span class="me">You</span> 🍌 <span class="mk">👑 ${BOSS.name}</span>`);
+      ko.textContent = 'KING BONKED!';
+      onBossKilled();
+    } else {
+      const T = TYPES[m.type];
+      feed(`<span class="me">You</span> 🍌 <span class="mk">${T.name}</span>${head ? ' 🎯' : ''}`);
+      ko.textContent = head ? 'HEADSHOT BONK!' : T.ko;
+      onMonkeyKilled(m);
+      monkeyAmmoDrop(m);
+      monkeyMedDrop(m);
+    }
+    ko.classList.remove('show'); void ko.offsetWidth; ko.classList.add('show');
+  }
+}
+
+function updateMonkey(m, dt) {
+  if (!m.active) return;
+  const g = m.group, S = m.scale;
+  if (m.dead) {
+    m.deadT += dt;
+    g.rotation.x = -Math.min(1, m.deadT * 3) * Math.PI / 2;
+    g.position.y = m.pos.y + 0.35 * S * Math.min(1, m.deadT * 3) - Math.max(0, m.deadT - (m.isBoss ? 3 : 1.4)) * 1.2 * S;
+    if (m.deadT > (m.isBoss ? 5.5 : 3.5)) deactivateMonkey(m);
+    return;
+  }
+  if (m.spawnT < 1) { m.spawnT = Math.min(1, m.spawnT + dt * 2.5); const t = m.spawnT; const s = 1 + 2.7 * Math.pow(t - 1, 3) + 1.7 * Math.pow(t - 1, 2); g.scale.setScalar(Math.max(0.01, s) * S); }
+  else g.scale.setScalar(S);
+
+  const dx = player.pos.x - m.pos.x, dz = player.pos.z - m.pos.z, dist = Math.hypot(dx, dz) || 1e-3;
+  m.aggro -= dt;
+  const chasing = started && !player.dead && (dist < 26 || m.aggro > 0);
+  let tx = 0, tz = 0, speed = 0;
+  if (chasing) { tx = dx / dist; tz = dz / dist; speed = m.speed; }
+  else {
+    m.wpT -= dt;
+    if (!m.wp || m.wpT <= 0 || Math.hypot(m.wp.x - m.pos.x, m.wp.z - m.pos.z) < 1.5) { m.wp = freeSpot(0); m.wpT = rand(4, 9); }
+    const wx = m.wp.x - m.pos.x, wz = m.wp.z - m.pos.z, wl = Math.hypot(wx, wz) || 1;
+    tx = wx / wl; tz = wz / wl; speed = 2.2;
+  }
+  // hunters keep their distance, strafe, and shoot bananas when they can see you
+  if (m.type === 'hunter' && chasing) {
+    m.losT -= dt;
+    if (m.losT <= 0) { m.losT = 0.25; m.los = hasLineOfSight(m); }
+    m.aim = Math.atan2((player.pos.y + 1.2) - (m.pos.y + 1.55), dist);
+    if (m.los && dist < 17) {
+      if (dist < 8) { tx = -dx / dist; tz = -dz / dist; speed = m.speed * 0.8; }
+      else {
+        m.strafeT -= dt; if (m.strafeT <= 0) { m.strafe *= -1; m.strafeT = rand(1, 2.5); }
+        tx = -dz / dist * m.strafe; tz = dx / dist * m.strafe; speed = m.speed * 0.55;
+      }
+    }
+    m.shootCd -= dt;
+    if (m.los && dist < 30 && m.shootCd <= 0 && m.spawnT >= 1) {
+      hunterShoot(m);
+      m.burstLeft--;
+      if (m.burstLeft > 0) m.shootCd = 0.32; else { m.burstLeft = 3; m.shootCd = rand(1.7, 2.6); }
+    }
+  }
+  if (m.stuckT > 0.25) { const s = m.steer; const nx = tx * 0.35 - tz * s, nz = tz * 0.35 + tx * s, l = Math.hypot(nx, nz); tx = nx / l; tz = nz / l; }
+  for (const o of monkeys) {
+    if (o === m || o.dead) continue;
+    const ox = m.pos.x - o.pos.x, oz = m.pos.z - o.pos.z, od = Math.hypot(ox, oz);
+    if (od < 0.65 * (S + o.scale) && od > 1e-3) { const push = o.isBoss ? 2 : 0.8; tx += ox / od * push; tz += oz / od * push; }
+  }
+  // boss ground slam: leaps toward the player and sends out a shockwave on landing
+  if (m.isBoss) {
+    m.slamCd -= dt;
+    if (chasing && m.grounded && m.slamCd <= 0 && dist > 3 && dist < 20) {
+      m.vel.y = 13; m.slamming = true; m.grounded = false;
+      m.slamCd = m.enraged ? rand(3.5, 5.5) : rand(6, 9);
+      sfx.roar();
+    }
+    if (m.slamming && !m.grounded) speed *= 1.8;
+  }
+  // melee
+  m.punchT = Math.max(0, m.punchT - dt);
+  const reach = 1.3 + 0.45 * S;
+  if (chasing && dist < reach && Math.abs(player.pos.y - m.pos.y) < 1.8 * S) {
+    speed = 0; m.attackCd -= dt;
+    if (m.attackCd <= 0) {
+      m.attackCd = m.cd; m.punchT = 0.3; damagePlayer(m.dmg);
+      if (m.isBoss) { player.vel.x += dx / dist * 12; player.vel.z += dz / dist * 12; player.vel.y = 6; player.onGround = false; sfx.slam(); }
+      else {
+        if (m.type === 'brute') { player.vel.x += dx / dist * 6; player.vel.z += dz / dist * 6; player.vel.y = 4; player.onGround = false; }
+        sfx.monkey();
+      }
+    }
+  } else m.attackCd = Math.min(m.attackCd + dt, 0.45);
+
+  const k = 1 - Math.exp(-8 * dt);
+  m.vel.x += (tx * speed - m.vel.x) * k; m.vel.z += (tz * speed - m.vel.z) * k;
+  m.vel.y -= GRAV * dt;
+  if (!m.isBoss && m.grounded && chasing && dist > 4 && Math.random() < dt * 0.35) m.vel.y = 7.5; // playful hops
+  const px = m.pos.x, pz = m.pos.z;
+  m.pos.addScaledVector(m.vel, dt);
+  m.grounded = collideWorld(m.pos, m.vel, m.isBoss ? 1.1 : 0.45 * S, 2.3 * S);
+  m.pos.x = clamp(m.pos.x, -HALF + 0.5 * S, HALF - 0.5 * S); m.pos.z = clamp(m.pos.z, -HALF + 0.5 * S, HALF - 0.5 * S);
+  if (m.isBoss && m.slamming && m.grounded) bossSlam(m);
+  const moved = Math.hypot(m.pos.x - px, m.pos.z - pz) / Math.max(dt, 1e-4);
+  if (speed > 1 && moved < speed * 0.35) m.stuckT += dt; else m.stuckT = Math.max(0, m.stuckT - dt * 0.5);
+  if (m.stuckT > 0.5 && m.grounded) { m.vel.y = m.isBoss ? 12 : 9; m.steer = Math.random() < 0.5 ? -1 : 1; }
+  if (m.stuckT > 1.8) m.stuckT = 0;
+
+  const hs = Math.hypot(m.vel.x, m.vel.z);
+  const targetYaw = chasing ? Math.atan2(dx, dz) : (hs > 0.3 ? Math.atan2(m.vel.x, m.vel.z) : m.yaw);
+  m.yaw = lerpAngle(m.yaw, targetYaw, 1 - Math.exp(-10 * dt));
+  g.rotation.set(0, m.yaw, 0);
+  g.position.copy(m.pos);
+
+  // animation
+  m.phase += hs * dt * 2.4 / S;
+  const sw = Math.sin(m.phase) * Math.min(1, hs / 3);
+  m.legs[0].rotation.x = sw * 0.8; m.legs[1].rotation.x = -sw * 0.8;
+  if (chasing) {
+    m.arms[0].rotation.x = -1.3 + Math.sin(m.phase * 2) * 0.35;
+    m.arms[1].rotation.x = -1.3 - Math.sin(m.phase * 2) * 0.35;
+  } else { m.arms[0].rotation.x = -sw * 0.7; m.arms[1].rotation.x = sw * 0.7; }
+  if (m.isBoss && m.slamming) { m.arms[0].rotation.x = m.arms[1].rotation.x = -2.8; }
+  if (m.type === 'hunter' && chasing && m.los) m.arms[1].rotation.x = -Math.PI / 2 - m.aim;   // point the gun
+  if (m.punchT > 0) { const p = Math.sin((1 - m.punchT / 0.3) * Math.PI); m.arms[0].rotation.x = -1.6 - p * 0.5; m.arms[1].rotation.x = -1.6 - p * 0.5; m.arms[0].position.z = m.arms[1].position.z = p * 0.25; }
+  else m.arms[0].position.z = m.arms[1].position.z = 0;
+  m.tail.rotation.y = Math.sin(time * 3 + m.phase) * 0.4;
+  m.head.rotation.z = Math.sin(time * 2 + m.phase) * 0.06;
+  if (!m.grounded) { m.legs[0].rotation.x = m.legs[1].rotation.x = -0.5; }
+
+  // hit flash (boss glows red while enraged)
+  m.flash -= dt;
+  const e = m.flash > 0 ? 0.8 : 0;
+  for (const mt of m.mats) mt.emissive.setRGB(Math.max(e, m.enraged ? 0.25 + Math.sin(time * 8) * 0.1 : 0), e, e);
+
+  // health bar
+  m.bar.position.set(m.pos.x, m.pos.y + 2.75 * g.scale.y, m.pos.z);
+  m.bar.quaternion.copy(camera.quaternion);
+  const f = m.hp / m.maxHp;
+  m.fg.scale.x = Math.max(0.001, f);
+  m.fgMat.color.setHex(f > 0.6 ? 0x4cff4c : f > 0.3 ? 0xffd23b : 0xff4040);
+
+  m.chatter -= dt;
+  if (m.chatter <= 0) { m.chatter = rand(4, 9); if (dist < 14) m.isBoss ? sfx.roar() : sfx.monkey(); }
+}
+
+// ============================================================
+//  Waves & boss fight
+// ============================================================
+const game = { state: 'menu', wave: 0, spawned: 0, killed: 0, spawnT: 0, timer: 0, won: false, runTime: 0, deaths: 0 };
+const aliveCount = () => monkeys.filter(m => m.active && !m.dead).length;
+
+function startGame() {
+  for (const m of monkeys) deactivateMonkey(m);
+  kills = 0; document.getElementById('kills').textContent = 0;
+  game.won = false; game.runTime = 0; game.deaths = 0;
+  player.hp = player.maxHp; player.stamina = player.maxStamina; player.exhausted = false;
+  resetAmmo(false); clearPickups(); resetSupplies();
+  beginWave(0);
+}
+function beginWave(i) {
+  for (const m of monkeys) deactivateMonkey(m);
+  game.wave = i; game.spawned = 0; game.killed = 0; game.spawnT = 0;
+  enemyShots.forEach(p => scene.remove(p.mesh)); enemyShots.length = 0;
+  if (i < waves().length) {
+    const w = waves()[i];
+    const q = [];
+    for (const k in w.mix) for (let j = 0; j < w.mix[k]; j++) q.push(k);
+    while (q.length < w.count) q.push('normal');
+    for (let j = q.length - 1; j > 0; j--) { const r = Math.floor(Math.random() * (j + 1)); [q[j], q[r]] = [q[r], q[j]]; }
+    const firstNormal = q.indexOf('normal'); if (firstNormal > 0) [q[0], q[firstNormal]] = [q[firstNormal], q[0]];   // ease in
+    game.queue = q;
+    const parts = ['normal', 'hunter', 'brute'].map(k => [k, q.filter(t => t === k).length]).filter(([, n]) => n).map(([k, n]) => `${n} ${n === 1 ? TYPES[k].name.toLowerCase() : TYPES[k].plural}`);
+    game.state = 'intro'; game.timer = 3;
+    banner(`WAVE ${i + 1}`, parts.join(' · ') + ' incoming!', 2.8);
+    sfx.wave();
+  } else {
+    game.state = 'bossIntro'; game.timer = 4;
+    banner('BOSS BATTLE!', `${BOSS.name} approaches... jump to dodge his ground slam!`, 3.8);
+    sfx.roar();
+  }
+}
+function onMonkeyKilled() { if (game.state === 'fight') game.killed++; }
+function onBossKilled() {
+  for (const m of monkeys) if (m.active && !m.dead && !m.isBoss) { m.dead = true; m.deadT = 0; m.bar.visible = false; burst(m.pos.clone().setY(1.4), 0x7a4a24, 10, 5); }
+  game.state = 'victory'; game.timer = 4.5;
+  banner('VICTORY!', 'The Banana King has been bonked!', 4.2);
+  sfx.win();
+}
+function restartAfterDeath() {
+  game.deaths++;
+  if (game.state === 'clear' || game.state === 'victory' || game.state === 'won') return;
+  beginWave(game.wave);
+}
+function updateWaves(dt) {
+  if (game.state === 'menu' || game.state === 'won') return;
+  if (game.state !== 'victory') game.runTime += dt;
+  game.timer -= dt;
+  if (game.state === 'intro') { if (game.timer <= 0) { game.state = 'fight'; game.spawnT = 0; } }
+  else if (game.state === 'fight') {
+    const w = waves()[game.wave];
+    game.spawnT -= dt;
+    if (game.spawned < w.count && aliveCount() < w.alive && game.spawnT <= 0) {
+      const m = monkeys.find(o => !o.active && !o.isBoss);
+      if (m) { activateMonkey(m, monkeyCfg(w, game.queue[game.spawned])); game.spawned++; game.spawnT = 0.7; }
+    }
+    if (game.killed >= w.count) {
+      game.state = 'clear'; game.timer = 4;
+      const last = game.wave === waves().length - 1;
+      banner('WAVE CLEARED!', last ? 'Something BIG is coming...' : `Get ready for wave ${game.wave + 2}`, 3.6);
+      sfx.win();
+    }
+  }
+  else if (game.state === 'clear') { if (game.timer <= 0) beginWave(game.wave + 1); }
+  else if (game.state === 'bossIntro') { if (game.timer <= 0) { activateMonkey(boss, { hp: BOSS.hp * D().hp, speed: BOSS.speed * D().speed, dmg: Math.round(BOSS.dmg * D().dmg), cd: BOSS.cd }); game.state = 'boss'; } }
+  else if (game.state === 'victory') { if (game.timer <= 0) showWin(); }
+}
+
+const bannerEl = document.getElementById('banner');
+function banner(big, small, dur) {
+  document.getElementById('bannerBig').textContent = big;
+  document.getElementById('bannerSmall').textContent = small;
+  bannerEl.style.animationDuration = dur + 's';
+  bannerEl.classList.remove('show'); void bannerEl.offsetWidth; bannerEl.classList.add('show');
+}
+function showWin() {
+  game.state = 'won'; game.won = true;
+  const t = Math.round(game.runTime), mm = Math.floor(t / 60), ss = String(t % 60).padStart(2, '0');
+  document.getElementById('winStats').innerHTML = `${D().name} · Time <b>${mm}:${ss}</b> · KOs <b>${kills}</b> · Deaths <b>${game.deaths}</b>`;
+  document.getElementById('win').style.display = 'flex';
+  leaveGame();
+}
+
+// ============================================================
+//  Limited ammo: reserves, breakable supply crates, pickups
+// ============================================================
+const AMMO_START = [36, 12, 10];   // spare ammo carried on top of a full magazine (pistol, shotgun, sniper)
+const AMMO_MAX = [120, 36, 25];    // most spare ammo you can carry
+const PACK_BIG = [24, 8, 5];       // found inside a supply crate (and shaken loose from the boss)
+const PACK_SMALL = [12, 4, 2];     // dropped by bonked monkeys
+const DROP_CHANCE = 0.45;
+// Medkits: health does not regenerate, so these are the only way to heal.
+const MED_COUNT = 3;               // medkit crates on the map
+const MED_BIG = 50;                // health from a medkit crate (and from the boss)
+const MED_SMALL = 25;              // health from a medkit dropped by a monkey
+const MED_CHANCE = { normal: 0.2, hunter: 0.3, brute: 0.6 };
+ammoState.forEach((s, i) => { s.reserve = AMMO_START[i]; });
+function resetAmmo(keepExtra) {
+  ammoState.forEach((s, i) => { s.ammo = WEAPONS[i].mag; s.reserve = keepExtra ? Math.max(s.reserve, AMMO_START[i]) : AMMO_START[i]; s.reloading = false; });
+}
+const totalAmmo = () => ammoState.reduce((a, s) => a + s.ammo + s.reserve, 0);
+
+// ---------- supply crates: shoot them to break them open ----------
+const SUPPLY_COUNT = 6, SC = 1.0;
+const supplies = [];
+const medRed = mat(0xe02626), medWhite = mat(0xf4f1ea);
+const medCrateMat = new THREE.MeshStandardMaterial({ roughness: 0.9, map: canvasTex(128, (g, s) => {
+  g.fillStyle = '#efe6d2'; g.fillRect(0, 0, s, s);
+  g.fillStyle = '#dccfb4'; for (let i = 0; i < 4; i++) g.fillRect(0, i * s / 4 + 2, s, 3);
+  g.strokeStyle = '#8a6a3c'; g.lineWidth = 12; g.strokeRect(6, 6, s - 12, s - 12);
+  g.fillStyle = '#e02626'; g.fillRect(s * 0.42, s * 0.22, s * 0.16, s * 0.56); g.fillRect(s * 0.22, s * 0.42, s * 0.56, s * 0.16);
+}) });
+function buildSupply(kind) {
+  const g = new THREE.Group();
+  const med = kind === 'med';
+  const b = box(SC, SC, SC, med ? medCrateMat : crateMat); b.position.y = SC / 2;
+  g.add(b);
+  if (med) {
+    const c1 = box(0.5, 0.08, 0.16, medRed), c2 = box(0.16, 0.08, 0.5, medRed);
+    c1.position.y = c2.position.y = SC + 0.04; g.add(c1, c2);
+  } else {
+    const band = box(SC + 0.04, 0.2, SC + 0.04, M.accent); band.position.y = SC / 2;
+    const ban = makeBanana(0.5, 0.07, 0.1); ban.position.set(0, SC + 0.07, 0); ban.rotation.y = 0.6;
+    g.add(band, ban);
+  }
+  g.visible = false; scene.add(g);
+  return { kind, group: g, box: null, active: false, respawnT: 0 };
+}
+function placeSupply(s) {
+  if (s.active) return;
+  const p = freeSpot(10, 1.5);
+  s.group.position.set(p.x, 0, p.z); s.group.visible = true; s.active = true;
+  s.box = new THREE.Box3(new V3(p.x - SC / 2, 0, p.z - SC / 2), new V3(p.x + SC / 2, SC, p.z + SC / 2));
+  s.box.supply = s;
+  boxes.push(s.box);
+}
+function removeSupply(s) {
+  if (!s.active) return;
+  s.active = false; s.group.visible = false;
+  const i = boxes.indexOf(s.box); if (i >= 0) boxes.splice(i, 1);
+}
+function breakSupply(s) {
+  if (!s.active) return;
+  const c = s.group.position.clone().setY(SC / 2);
+  removeSupply(s);
+  const med = s.kind === 'med';
+  s.respawnT = med ? (game.state === 'boss' ? 18 : 30) : (game.state === 'boss' ? 12 : 22);
+  burst(c, med ? 0xefe6d2 : 0xb07a3e, 18, 6); burst(c, med ? 0xe02626 : 0x6e4420, 8, 5);
+  sfx.crate();
+  if (med) spawnPickup(c, MED_BIG, true, 'med'); else spawnPickup(c, PACK_BIG, true);
+}
+function updateSupplies(dt) {
+  for (const s of supplies) if (!s.active) { s.respawnT -= dt; if (s.respawnT <= 0) placeSupply(s); }
+}
+function resetSupplies() {
+  for (const s of supplies) { removeSupply(s); placeSupply(s); }
+}
+for (let i = 0; i < SUPPLY_COUNT; i++) { const s = buildSupply('ammo'); supplies.push(s); placeSupply(s); }
+for (let i = 0; i < MED_COUNT; i++) { const s = buildSupply('med'); supplies.push(s); placeSupply(s); }
+
+// ---------- ammo pickups (glowing banana bundles) ----------
+const pickups = [];
+const pickupMat = mat(0xffe14a, { emissive: 0xffb000, emissiveIntensity: 0.55, roughness: 0.5 });
+const medGlow = mat(0xf4f1ea, { emissive: 0xffffff, emissiveIntensity: 0.25 });
+function spawnPickup(pos, amounts, big, kind = 'ammo') {
+  const g = new THREE.Group();
+  if (kind === 'med') {
+    g.add(box(0.5, 0.36, 0.36, medGlow));
+    for (const sx of [-1, 1]) {   // red cross on both sides
+      const a = box(0.06, 0.24, 0.08, medRed), b = box(0.06, 0.08, 0.24, medRed);
+      a.position.x = b.position.x = sx * 0.26; g.add(a, b);
+    }
+    const h = box(0.2, 0.06, 0.06, medRed); h.position.y = 0.21; g.add(h);   // handle
+  } else for (let k = 0; k < 3; k++) {
+    const b = makeBanana(0.42, 0.07, 0.1, pickupMat);
+    b.rotation.set(0, k * 2.1, 0.5); b.position.set(Math.cos(k * 2.1) * 0.12, 0, Math.sin(k * 2.1) * 0.12);
+    g.add(b);
+  }
+  g.scale.setScalar(big ? 1.35 : 1);
+  g.position.copy(pos);
+  scene.add(g);
+  pickups.push({ group: g, kind, amounts, base: pos.y, vy: 5, y: pos.y + 0.3, age: 0, landed: false });
+}
+function clearPickups() { for (const p of pickups) scene.remove(p.group); pickups.length = 0; }
+// Monkeys drop ammo some of the time, always if you are almost out.
+function monkeyAmmoDrop(m) {
+  const chance = m.type === 'brute' ? 1 : m.type === 'hunter' ? 0.6 : DROP_CHANCE;   // tougher monkeys drop more often
+  if (Math.random() < chance * D().drops || totalAmmo() < 15) spawnPickup(m.pos.clone().setY(m.pos.y + 0.6), PACK_SMALL, false);
+}
+function monkeyMedDrop(m) {
+  const chance = (MED_CHANCE[m.type] ?? 0.2) + (player.hp < 35 ? 0.25 : 0);
+  if (Math.random() < chance * D().drops) spawnPickup(m.pos.clone().add(new V3(rand(-0.8, 0.8), 0.6, rand(-0.8, 0.8))), MED_SMALL, false, 'med');
+}
+// The boss shakes loose a big bundle every 10% of his health (and a medkit every 25%), tossed a few metres away.
+function bossAmmoDrop(m, kind = 'ammo') {
+  const a = rand(0, Math.PI * 2), d = rand(5, 8);
+  let x = clamp(m.pos.x + Math.cos(a) * d, -HALF + 2, HALF - 2), z = clamp(m.pos.z + Math.sin(a) * d, -HALF + 2, HALF - 2);
+  if (blocked(x, z, 0.8)) ({ x, z } = freeSpot(0));
+  if (kind === 'med') spawnPickup(new V3(x, 0.6, z), MED_BIG, true, 'med'); else spawnPickup(new V3(x, 0.6, z), PACK_BIG, true);
+}
+function collectPickup(p) {
+  if (p.kind === 'med') {
+    if (player.hp >= player.maxHp) return false;   // full health: leave it for later
+    const add = Math.min(p.amounts, player.maxHp - player.hp);
+    player.hp += add;
+    feed(`<span class="me">Medkit</span> +${Math.round(add)} ❤️`);
+    sfx.heal();
+    return true;
+  }
+  const parts = [];
+  ammoState.forEach((s, i) => {
+    const add = Math.min(p.amounts[i], AMMO_MAX[i] - s.reserve);
+    if (add > 0) { s.reserve += add; parts.push(`+${add} ${WEAPONS[i].icon}`); }
+  });
+  if (!parts.length) return false;   // already full: leave it on the ground
+  feed(`<span class="me">Ammo</span> ${parts.join(' &nbsp;')}`);
+  sfx.pickup();
+  return true;
+}
+function updatePickups(dt) {
+  for (let i = pickups.length - 1; i >= 0; i--) {
+    const p = pickups[i]; p.age += dt;
+    if (!p.landed) { p.vy -= GRAV * dt; p.y += p.vy * dt; if (p.y <= p.base && p.vy < 0) { p.y = p.base; p.landed = true; } }
+    const g = p.group;
+    g.position.y = p.y + (p.landed ? Math.sin(p.age * 3) * 0.12 : 0);
+    g.rotation.y += dt * 2;
+    g.visible = p.age < 25 || Math.sin(p.age * 20) > 0;   // blink before vanishing
+    const dx = player.pos.x - g.position.x, dz = player.pos.z - g.position.z, dy = (player.pos.y + 0.9) - g.position.y;
+    const got = !player.dead && dx * dx + dz * dz < 1.6 * 1.6 && Math.abs(dy) < 1.8 && collectPickup(p);
+    if (got || p.age > 30) { scene.remove(g); pickups.splice(i, 1); }
+  }
+}
+
+// ============================================================
+//  Player damage / death
+// ============================================================
+function damagePlayer(d) {
+  if (player.dead) return;
+  player.hp -= d; player.lastHurt = time; hurtFlash = 1; shake = 0.25; sfx.hurt();
+  if (player.hp <= 0) {
+    player.hp = 0; player.dead = true; deathT = 3;
+    fireHeld = aimHeld = false;
+    document.getElementById('death').style.display = 'flex';
+  }
+}
+function respawnPlayer() {
+  player.pos.copy(SPAWN); player.vel.set(0, 0, 0); player.yaw = 0; player.pitch = 0;
+  player.hp = player.maxHp; player.dead = false; player.eye = 1.6; player.stamina = player.maxStamina; player.exhausted = false;
+  resetAmmo(true);
+  restartAfterDeath();
+  document.getElementById('death').style.display = 'none';
+}
+
+// ============================================================
+//  HUD
+// ============================================================
+const $ = id => document.getElementById(id);
+const slotsEl = $('slots');
+WEAPONS.forEach((w, i) => {
+  const d = document.createElement('div'); d.className = 'slot';
+  d.innerHTML = `<span class="k">${i + 1}</span><span class="a"></span><span class="ico">${w.icon}</span><span class="n outline">${w.name.replace('Banana ', '')}</span>`;
+  slotsEl.appendChild(d);
+});
+function refreshSlots() { [...slotsEl.children].forEach((c, i) => c.classList.toggle('active', i === cur)); }
+refreshSlots();
+
+const hm = $('hitmarker');
+function hitmark(kind) { hm.className = ''; void hm.offsetWidth; hm.className = 'show ' + kind; }
+
+const feedEl = $('feed');
+function feed(html) {
+  const d = document.createElement('div'); d.className = 'feed outline'; d.innerHTML = html;
+  feedEl.prepend(d);
+  setTimeout(() => d.classList.add('out'), 3500); setTimeout(() => d.remove(), 4100);
+  while (feedEl.children.length > 5) feedEl.lastChild.remove();
+}
+
+const dmgLayer = $('dmgLayer'), dmgNums = [];
+function showDamage(m, dmg, head) {
+  const n = m.dmgNum;
+  if (n && n.el.isConnected && time - n.last < 0.35) {
+    n.value += dmg; n.last = time; n.age = 0; n.head = n.head || head;
+    n.pos.set(m.pos.x + n.ox, m.pos.y + 2.4 * m.scale, m.pos.z);
+  } else {
+    const el = document.createElement('div'); el.className = 'dmg outline';
+    dmgLayer.appendChild(el);
+    m.dmgNum = { el, value: dmg, last: time, age: 0, head, ox: rand(-0.4, 0.4), pos: new V3(m.pos.x, m.pos.y + 2.4 * m.scale, m.pos.z) };
+    dmgNums.push(m.dmgNum);
+  }
+  const d = m.dmgNum;
+  d.el.textContent = Math.round(d.value);
+  d.el.classList.toggle('head', d.head);
+}
+function updateDamageNumbers(dt) {
+  for (let i = dmgNums.length - 1; i >= 0; i--) {
+    const n = dmgNums[i]; n.age += dt;
+    if (n.age > 1) { n.el.remove(); dmgNums.splice(i, 1); continue; }
+    n.pos.y += dt * 0.7;
+    _tmp.copy(n.pos).project(camera);
+    if (_tmp.z > 1) { n.el.style.opacity = 0; continue; }
+    const x = (_tmp.x + 1) / 2 * innerWidth, y = (1 - _tmp.y) / 2 * innerHeight;
+    const pop = n.age < 0.1 ? 1.5 - n.age * 5 : 1;
+    n.el.style.transform = `translate(-50%,-50%) translate(${x}px,${y}px) scale(${pop})`;
+    n.el.style.opacity = 1 - Math.max(0, (n.age - 0.65) / 0.35);
+  }
+}
+
+const stamFill = $('stamFill'), tAimEl = $('tAim');
+const hpText = $('hpText'), hpFill = $('hpFill'), wName = $('wName'), ammoCount = $('ammoCount'), reloadBar = $('reloadBar'), reloadFill = reloadBar.firstChild;
+const vignette = $('vignette'), scopeEl = $('scope'), chEl = $('crosshair');
+const waveEl = $('waveNum'), leftEl = $('leftNum'), leftPill = $('leftPill'), bossBar = $('bossBar'), bossFill = $('bossFill'), bossHp = $('bossHp');
+const ch = { T: $('chT'), B: $('chB'), L: $('chL'), R: $('chR') };
+let chGap = 7, noAmmoT = 0;
+const noAmmoEl = $('noAmmo');
+function updateHUD(dt) {
+  const hp = Math.ceil(player.hp);
+  hpText.textContent = hp;
+  hpFill.style.width = (player.hp / player.maxHp * 100) + '%';
+  if (isTouch) tAimEl.classList.toggle('on', aimHeld);
+  stamFill.style.width = (player.stamina / player.maxStamina * 100) + '%';
+  stamFill.classList.toggle('tired', player.exhausted);
+  hpFill.style.background = player.hp > 50 ? 'linear-gradient(#7dff6e,#2fc63b)' : player.hp > 25 ? 'linear-gradient(#ffe36e,#e0a91b)' : 'linear-gradient(#ff7a6e,#d42a2a)';
+  const w = WEAPONS[cur], s = ammoState[cur];
+  wName.textContent = w.name;
+  ammoCount.innerHTML = `${s.ammo}<small style="color:${s.reserve === 0 ? '#ff5050' : ''}"> / ${s.reserve}</small>`;
+  ammoCount.style.color = s.ammo === 0 ? '#ff5050' : '#fff';
+  [...slotsEl.children].forEach((c, i) => { const t = ammoState[i].ammo + ammoState[i].reserve; const a = c.querySelector('.a'); a.textContent = t; a.classList.toggle('empty', t === 0); });
+  noAmmoT = Math.max(0, noAmmoT - dt);
+  noAmmoEl.style.display = started && !player.dead && (noAmmoT > 0 || (s.ammo === 0 && s.reserve === 0)) ? 'block' : 'none';
+  if (s.reloading) { reloadBar.style.visibility = 'visible'; reloadFill.style.width = ((time - s.reloadStart) / w.reload * 100) + '%'; }
+  else reloadBar.style.visibility = 'hidden';
+  vignette.style.opacity = Math.max(hurtFlash, player.hp < 35 && !player.dead ? 0.35 + Math.sin(time * 6) * 0.1 : 0);
+  const scoped = w.scope && zoom > 0.7;
+  scopeEl.style.display = scoped ? 'block' : 'none';
+  chEl.style.display = scoped ? 'none' : 'block';
+  const moving = Math.hypot(player.vel.x, player.vel.z) > 1 || !player.onGround;
+  const target = (w.gap * (aimHeld ? 0.6 : 1) + (moving ? 5 : 0) + recoil * 10);
+  chGap += (target - chGap) * Math.min(1, dt * 15);
+  const L = w.pellets > 1 ? 10 : 8, T = 2;
+  Object.assign(ch.T.style, { width: T + 'px', height: L + 'px', left: -T / 2 + 'px', top: (-chGap - L) + 'px' });
+  Object.assign(ch.B.style, { width: T + 'px', height: L + 'px', left: -T / 2 + 'px', top: chGap + 'px' });
+  Object.assign(ch.L.style, { width: L + 'px', height: T + 'px', top: -T / 2 + 'px', left: (-chGap - L) + 'px' });
+  Object.assign(ch.R.style, { width: L + 'px', height: T + 'px', top: -T / 2 + 'px', left: chGap + 'px' });
+  const bossFight = game.state === 'bossIntro' || game.state === 'boss' || game.state === 'victory' || game.state === 'won';
+  waveEl.textContent = bossFight ? 'BOSS' : `${game.wave + 1}/${waves().length}`;
+  leftPill.style.display = bossFight ? 'none' : '';
+  if (!bossFight) leftEl.textContent = game.state === 'menu' ? WAVES[0].count : waves()[game.wave].count - game.killed;
+  bossBar.style.display = boss.active ? 'block' : 'none';
+  if (boss.active) {
+    const f = boss.hp / boss.maxHp;
+    bossFill.style.width = (f * 100) + '%';
+    bossFill.classList.toggle('enraged', boss.enraged);
+    bossHp.textContent = `${Math.ceil(boss.hp)} / ${boss.maxHp}`;
+  }
+}
+
+// ============================================================
+//  Input
+// ============================================================
+const keys = {};
+let locked = false, fireHeld = false, aimHeld = false, zoom = 0, started = false;
+const menu = $('menu'), playBtn = $('play');
+
+// ---------- KOs + weapon upgrades (saved in this browser) ----------
+const UPGRADE_COSTS = [1, 5, 10, 20, 50];   // KOs for upgrades 1..5
+const MAX_LEVEL = UPGRADE_COSTS.length;
+const DMG_PER_LEVEL = 0.15;                 // +15% damage per upgrade
+const RATE_PER_LEVEL = 0.12;                // +12% shots per second per upgrade
+const BOSS_KO_VALUE = 10;                   // the Banana King is worth 10 KOs
+let save = { kos: 0, levels: [0, 0, 0] };
+try {
+  const d = JSON.parse(localStorage.getItem('bananabattles.save'));
+  if (d && Number.isFinite(d.kos) && Array.isArray(d.levels))
+    save = { kos: Math.max(0, Math.floor(d.kos)), levels: WEAPONS.map((_, i) => clamp(Math.floor(d.levels[i]) || 0, 0, MAX_LEVEL)) };
+} catch (e) {}
+function writeSave() { try { localStorage.setItem('bananabattles.save', JSON.stringify(save)); } catch (e) {} }
+function dmgMul(i, lvl = save.levels[i]) { return 1 + DMG_PER_LEVEL * lvl; }
+function rateMul(i, lvl = save.levels[i]) { return 1 / (1 + RATE_PER_LEVEL * lvl); }
+function addKOs(n) { save.kos += n; writeSave(); }
+
+const upgradesEl = $('upgrades'), upCards = $('upCards');
+function renderUpgrades() {
+  $('upKos').textContent = save.kos; $('menuKos').textContent = save.kos;
+  upCards.innerHTML = WEAPONS.map((w, i) => {
+    const L = save.levels[i], max = L >= MAX_LEVEL, cost = UPGRADE_COSTS[L];
+    const dmg = l => Math.round(w.dmg * dmgMul(i, l)) + (w.pellets > 1 ? ` ×${w.pellets}` : '');
+    const rps = l => (1 / (w.rate * rateMul(i, l))).toFixed(1) + '/s';
+    const next = (f) => max ? '' : ` → <b class="up">${f(L + 1)}</b>`;
+    const pips = Array.from({ length: MAX_LEVEL }, (_, k) => `<i class="${k < L ? 'on' : ''}"></i>`).join('');
+    const btn = max ? `<button class="upbtn max" disabled>MAX</button>`
+      : `<button class="upbtn" data-i="${i}" ${save.kos < cost ? 'disabled' : ''}>UPGRADE · ${cost} KO${cost > 1 ? 's' : ''}</button>`;
+    return `<div class="upcard"><div class="ico">${w.icon}</div><div class="nm outline">${w.name}</div>
+      <div class="lv">Level ${L} / ${MAX_LEVEL}</div><div class="pips">${pips}</div>
+      <div class="upstat">Damage <b>${dmg(L)}</b>${next(dmg)}</div>
+      <div class="upstat">Fire rate <b>${rps(L)}</b>${next(rps)}</div>${btn}</div>`;
+  }).join('');
+}
+upCards.addEventListener('click', e => {
+  const b = e.target.closest('.upbtn[data-i]'); if (!b) return;
+  const i = +b.dataset.i, L = save.levels[i];
+  if (L >= MAX_LEVEL || save.kos < UPGRADE_COSTS[L]) return;
+  save.kos -= UPGRADE_COSTS[L]; save.levels[i]++; writeSave();
+  initAudio(); sfx.win();
+  renderUpgrades();
+});
+$('upgradesBtn').addEventListener('click', () => { renderUpgrades(); upgradesEl.style.display = 'flex'; });
+$('upgradesBack').addEventListener('click', () => { upgradesEl.style.display = 'none'; });
+renderUpgrades();
+
+// ---------- settings: mouse sensitivity (remembered in this browser) ----------
+let sensMul = 1;
+try { const v = parseFloat(localStorage.getItem('bananabattles.sens')); if (v >= 0.1 && v <= 3) sensMul = v; } catch (e) {}
+const sensEl = $('sens'), sensVal = $('sensVal'), settingsEl = $('settings');
+function setSens(v) {
+  sensMul = clamp(v, 0.1, 3); sensEl.value = sensMul; sensVal.textContent = sensMul.toFixed(2) + '×';
+  try { localStorage.setItem('bananabattles.sens', sensMul); } catch (e) {}
+}
+setSens(sensMul);
+sensEl.addEventListener('input', () => setSens(parseFloat(sensEl.value)));
+$('sensReset').addEventListener('click', () => setSens(1));
+document.querySelectorAll('.settingsBtn').forEach(b => b.addEventListener('click', () => { settingsEl.style.display = 'flex'; }));
+// ---------- settings: volume ----------
+try { const v = parseFloat(localStorage.getItem('bananabattles.vol')); if (v >= 0 && v <= 1) volMul = v; } catch (e) {}
+const volEl = $('vol'), volVal = $('volVal');
+function setVol(v) {
+  volMul = clamp(v, 0, 1); volEl.value = volMul; volVal.textContent = Math.round(volMul * 100) + '%';
+  if (master) master.gain.value = 0.35 * volMul;
+  try { localStorage.setItem('bananabattles.vol', volMul); } catch (e) {}
+}
+setVol(volMul);
+volEl.addEventListener('input', () => { initAudio(); setVol(parseFloat(volEl.value)); });
+volEl.addEventListener('change', () => sfx.pickup());   // short test sound when you let go
+$('volReset').addEventListener('click', () => { initAudio(); setVol(1); sfx.pickup(); });
+// ---------- settings: field of view ----------
+try { const v = parseFloat(localStorage.getItem('bananabattles.fov')); if (v >= 60 && v <= 100) BASE_FOV = v; } catch (e) {}
+const fovEl = $('fov'), fovVal = $('fovVal');
+function setFov(v) {
+  BASE_FOV = Math.round(clamp(v, 60, 100)); fovEl.value = BASE_FOV; fovVal.textContent = BASE_FOV + '°';
+  camera.fov = BASE_FOV; camera.updateProjectionMatrix();   // preview right away (even while paused); in-game, updatePlayer keeps it applied
+  try { localStorage.setItem('bananabattles.fov', BASE_FOV); } catch (e) {}
+}
+setFov(BASE_FOV);
+fovEl.addEventListener('input', () => setFov(parseFloat(fovEl.value)));
+$('fovReset').addEventListener('click', () => setFov(DEFAULT_FOV));
+$('settingsBack').addEventListener('click', () => { settingsEl.style.display = 'none'; });
+
+// Desktop uses pointer lock; phones and tablets "lock" by showing the touch controls.
+function enterGame() {
+  initAudio();
+  if (isTouch) {
+    const de = document.documentElement;
+    try { const r = (de.requestFullscreen || de.webkitRequestFullscreen)?.call(de); if (r && r.catch) r.catch(() => {}); } catch (e) {}
+    try { const r = screen.orientation?.lock?.('landscape'); if (r && r.catch) r.catch(() => {}); } catch (e) {}
+    onLockChange(true);
+  } else {
+    const p = renderer.domElement.requestPointerLock();
+    if (p && p.catch) p.catch(() => {});
+  }
+}
+function leaveGame() { if (isTouch) onLockChange(false); else document.exitPointerLock(); }
+// PLAY opens the difficulty picker; picking one starts the game.
+const diffEl = $('diff');
+playBtn.addEventListener('click', () => { initAudio(); diffEl.style.display = 'flex'; });
+for (const b of diffEl.querySelectorAll('[data-diff]')) b.addEventListener('click', () => {
+  difficulty = b.dataset.diff;
+  diffEl.style.display = 'none';
+  enterGame();
+});
+$('diffBack').addEventListener('click', () => { diffEl.style.display = 'none'; });
+function goToMainMenu() {
+  $('win').style.display = 'none'; $('pause').style.display = 'none'; $('death').style.display = 'none';
+  player.dead = false; player.eye = 1.6; hurtFlash = 0; shake = 0; deathT = 0;
+  ammoState.forEach(s => { s.reloading = false; });
+  projectiles.forEach(p => scene.remove(p.mesh)); projectiles.length = 0;
+  for (const m of monkeys) deactivateMonkey(m);
+  enemyShots.forEach(p => scene.remove(p.mesh)); enemyShots.length = 0;
+  clearPickups(); resetSupplies(); resetAmmo(false);
+  player.pos.copy(SPAWN); player.vel.set(0, 0, 0); player.yaw = 0; player.pitch = 0; player.hp = player.maxHp; player.stamina = player.maxStamina; player.exhausted = false;
+  kills = 0; $('kills').textContent = 0;
+  game.state = 'menu'; game.won = false; game.wave = 0; game.killed = 0;
+  started = false;   // back to the orbiting title camera; PLAY starts a fresh game
+  for (let i = 0; i < 5; i++) activateMonkey(monkeys[i], { ...monkeyCfg(WAVES[0]), aggro: 0 });
+  playBtn.textContent = 'PLAY';
+  renderUpgrades();
+  menu.style.display = 'flex';
+}
+$('toMenu').addEventListener('click', goToMainMenu);
+$('again').addEventListener('click', () => {
+  $('win').style.display = 'none';
+  player.pos.copy(SPAWN); player.vel.set(0, 0, 0); player.yaw = 0; player.pitch = 0;
+  startGame();
+  pauseEl.style.display = 'flex';   // fallback if the browser refuses pointer lock: RESUME starts play
+  $('pauseStats').innerHTML = `Wave <b>1/${waves().length}</b> · KOs <b>0</b> · Health <b>${player.maxHp}</b>`;
+  enterGame();
+});
+const pauseEl = $('pause');
+$('resume').addEventListener('click', enterGame);
+$('quit').addEventListener('click', goToMainMenu);
+document.addEventListener('pointerlockchange', () => onLockChange(document.pointerLockElement === renderer.domElement));
+function onLockChange(isLocked) {
+  locked = isLocked;
+  touchEl.style.display = isTouch && locked ? 'block' : 'none';
+  resetTouch();
+  const inGame = started && !game.won;
+  menu.style.display = !locked && !inGame && !game.won ? 'flex' : 'none';
+  pauseEl.style.display = !locked && inGame ? 'flex' : 'none';
+  if (locked) { started = true; settingsEl.style.display = 'none'; upgradesEl.style.display = 'none'; if (game.state === 'menu') startGame(); }
+  else {
+    fireHeld = aimHeld = false; for (const k in keys) keys[k] = false;
+    if (inGame) {
+      const bossFight = game.state === 'bossIntro' || game.state === 'boss' || game.state === 'victory';
+      $('pauseStats').innerHTML = `${D().name} · ${bossFight ? '<b>Boss battle</b>' : `Wave <b>${game.wave + 1}/${waves().length}</b>`} · KOs <b>${kills}</b> · Health <b>${Math.ceil(player.hp)}</b>`;
+    }
+  }
+}
+function lookBy(dx, dy, base) {
+  if (!locked || player.dead) return;
+  const sens = base * sensMul * (camera.fov / BASE_FOV);
+  player.yaw -= dx * sens;
+  player.pitch = clamp(player.pitch - dy * sens, -1.5, 1.5);
+  swayX = clamp(swayX + dx * 0.0004, -0.05, 0.05);
+  swayY = clamp(swayY + dy * 0.0004, -0.05, 0.05);
+}
+addEventListener('mousemove', e => { if (!isTouch) lookBy(e.movementX, e.movementY, 0.0022); });
+
+// ---------- touch controls ----------
+// Left 40% of the screen: a joystick appears where you put your thumb. Anywhere else: drag to look.
+// FIRE can also be dragged to aim while shooting. Tap a gun slot to switch.
+const touchEl = $('touch'), joyBase = $('joyBase'), joyKnob = $('joyKnob');
+const JOY_R = 55, TOUCH_LOOK = 0.0048;
+const joy = { id: null, ox: 0, oy: 0, x: 0, y: 0 };
+const lookTouches = new Map();   // touch id -> last position
+const btnTouches = new Map();    // touch id -> action
+let touchJump = false;
+function resetTouch() {
+  joy.id = null; joy.x = joy.y = 0; joyBase.style.display = 'none'; joyKnob.classList.remove('sprint');
+  lookTouches.clear(); btnTouches.clear(); touchJump = false;
+  for (const b of touchEl.querySelectorAll('.tbtn')) b.classList.remove('on');
+}
+function pressAct(act, down, el) {
+  if (act === 'fire') { fireHeld = down; el.classList.toggle('on', down); }
+  else if (act === 'jump') { touchJump = down; el.classList.toggle('on', down); }
+  else if (down && act === 'aim') { aimHeld = !aimHeld; el.classList.toggle('on', aimHeld); }
+  else if (down && act === 'reload') startReload();
+  else if (down && act === 'pause') leaveGame();
+}
+touchEl.addEventListener('touchstart', e => {
+  e.preventDefault();
+  if (!locked) return;
+  for (const t of e.changedTouches) {
+    const btn = t.target.closest && t.target.closest('[data-act]');
+    if (btn) {
+      btnTouches.set(t.identifier, btn.dataset.act);
+      pressAct(btn.dataset.act, true, btn);
+      if (btn.dataset.act === 'fire') lookTouches.set(t.identifier, { x: t.clientX, y: t.clientY });
+    } else if (t.clientX < innerWidth * 0.4 && joy.id === null) {
+      joy.id = t.identifier; joy.ox = t.clientX; joy.oy = t.clientY; joy.x = joy.y = 0;
+      joyBase.style.left = t.clientX + 'px'; joyBase.style.top = t.clientY + 'px'; joyBase.style.display = 'block';
+      joyKnob.style.transform = '';
+    } else lookTouches.set(t.identifier, { x: t.clientX, y: t.clientY });
+  }
+}, { passive: false });
+touchEl.addEventListener('touchmove', e => {
+  e.preventDefault();
+  for (const t of e.changedTouches) {
+    if (t.identifier === joy.id) {
+      let dx = t.clientX - joy.ox, dy = t.clientY - joy.oy;
+      const len = Math.hypot(dx, dy);
+      if (len > JOY_R) { dx *= JOY_R / len; dy *= JOY_R / len; }
+      joy.x = dx / JOY_R; joy.y = dy / JOY_R;
+      joyKnob.style.transform = `translate(${dx}px, ${dy}px)`;
+      joyKnob.classList.toggle('sprint', touchSprinting());
+    } else if (lookTouches.has(t.identifier)) {
+      const l = lookTouches.get(t.identifier);
+      lookBy(t.clientX - l.x, t.clientY - l.y, TOUCH_LOOK);
+      l.x = t.clientX; l.y = t.clientY;
+    }
+  }
+}, { passive: false });
+function endTouches(e) {
+  e.preventDefault();
+  for (const t of e.changedTouches) {
+    if (t.identifier === joy.id) { joy.id = null; joy.x = joy.y = 0; joyBase.style.display = 'none'; joyKnob.classList.remove('sprint'); }
+    lookTouches.delete(t.identifier);
+    const act = btnTouches.get(t.identifier);
+    if (act) { btnTouches.delete(t.identifier); pressAct(act, false, touchEl.querySelector(`[data-act="${act}"]`)); }
+  }
+}
+touchEl.addEventListener('touchend', endTouches, { passive: false });
+touchEl.addEventListener('touchcancel', endTouches, { passive: false });
+// push the stick nearly all the way forward to sprint
+const touchSprinting = () => joy.id !== null && joy.y < -0.85 && Math.abs(joy.x) < 0.6;
+// tap a gun slot to switch guns
+slotsEl.addEventListener('touchstart', e => {
+  const slot = e.target.closest('.slot'); if (!slot || !locked) return;
+  e.preventDefault();
+  switchTo([...slotsEl.children].indexOf(slot));
+}, { passive: false });
+// pause if the phone switches apps or locks
+document.addEventListener('visibilitychange', () => { if (document.hidden && isTouch && locked) leaveGame(); });
+addEventListener('mousedown', e => {
+  if (!locked) return;
+  if (e.button === 0) fireHeld = true;
+  if (e.button === 2) aimHeld = true;
+});
+addEventListener('mouseup', e => { if (e.button === 0) fireHeld = false; if (e.button === 2) aimHeld = false; });
+addEventListener('contextmenu', e => e.preventDefault());
+addEventListener('wheel', e => { if (!locked) return; switchTo((cur + (e.deltaY > 0 ? 1 : 2)) % 3); }, { passive: true });
+addEventListener('keydown', e => {
+  keys[e.code] = true;
+  if (!locked) return;
+  if (e.code === 'Digit1') switchTo(0);
+  if (e.code === 'Digit2') switchTo(1);
+  if (e.code === 'Digit3') switchTo(2);
+  if (e.code === 'KeyQ') switchTo(lastWeapon);
+  if (e.code === 'KeyR') startReload();
+  if (e.code === 'Space') e.preventDefault();
+});
+addEventListener('keyup', e => { keys[e.code] = false; });
+
+// ============================================================
+//  Update
+// ============================================================
+function updatePlayer(dt) {
+  if (player.dead) {
+    player.eye += (0.4 - player.eye) * Math.min(1, dt * 4);
+    deathT -= dt;
+    const what = game.state === 'boss' || game.state === 'bossIntro' ? 'the boss fight' : game.state === 'clear' ? 'the next wave' : `wave ${game.wave + 1}`;
+    $('deathText').textContent = `Restarting ${what} in ${Math.max(1, Math.ceil(deathT))}...`;
+    if (deathT <= 0) respawnPlayer();
+    return;
+  }
+  const f = clamp((keys.KeyW ? 1 : 0) - (keys.KeyS ? 1 : 0) - joy.y, -1, 1), s = clamp((keys.KeyD ? 1 : 0) - (keys.KeyA ? 1 : 0) + joy.x, -1, 1);
+  const sy = Math.sin(player.yaw), cy = Math.cos(player.yaw);
+  let wx = -sy * f + cy * s, wz = -cy * f - sy * s;
+  const analog = Math.min(1, Math.hypot(f, s));   // a half-pushed joystick walks slower
+  const wl = Math.hypot(wx, wz); if (wl > 0) { wx *= analog / wl; wz *= analog / wl; }
+  // stamina: 10 seconds of sprinting; refills after 1 s of not sprinting (full in 5 s).
+  // Running out leaves you tired until it is back to 25%.
+  if (player.stamina <= 0) player.exhausted = true;
+  if (player.exhausted && player.stamina >= player.maxStamina * 0.25) player.exhausted = false;
+  const sprint = (keys.ShiftLeft || keys.ShiftRight || touchSprinting()) && f > 0 && !aimHeld && !player.exhausted;
+  if (sprint && Math.hypot(player.vel.x, player.vel.z) > 1) { player.stamina = Math.max(0, player.stamina - dt); player.lastSprint = time; }
+  else if (time - player.lastSprint > 1) player.stamina = Math.min(player.maxStamina, player.stamina + dt * 2);
+  const speed = aimHeld ? 4 : sprint ? 10.5 : 7;
+  const k = 1 - Math.exp(-(player.onGround ? 14 : 3) * dt);
+  player.vel.x += (wx * speed - player.vel.x) * k;
+  player.vel.z += (wz * speed - player.vel.z) * k;
+  if ((keys.Space || touchJump) && player.onGround) { player.vel.y = 9; player.onGround = false; }
+  player.vel.y -= GRAV * dt;
+  player.pos.addScaledVector(player.vel, dt);
+  player.onGround = collideWorld(player.pos, player.vel, 0.4, 1.8);
+  player.pos.x = clamp(player.pos.x, -HALF + 0.4, HALF - 0.4);
+  player.pos.z = clamp(player.pos.z, -HALF + 0.4, HALF - 0.4);
+
+  // weapon logic
+  const w = WEAPONS[cur], st = ammoState[cur];
+  if (st.reloading && time >= st.reloadEnd) { const take = Math.min(w.mag - st.ammo, st.reserve); st.ammo += take; st.reserve -= take; st.reloading = false; }
+  swapT = Math.max(0, swapT - dt);
+  if (fireHeld && swapT <= 0 && time >= nextFire && !st.reloading) {
+    if (st.ammo > 0) { fire(); st.ammo--; nextFire = time + w.rate * rateMul(cur); }
+    else { sfx.empty(); nextFire = time + 0.3; startReload(); if (st.reserve <= 0) noAmmoT = 2; }
+  }
+  if (st.ammo === 0 && !st.reloading && time >= nextFire) startReload();
+
+  // sprint fov
+  const sprintFov = sprint && Math.hypot(player.vel.x, player.vel.z) > 8 ? 6 : 0;
+  zoom += ((aimHeld && !st.reloading ? 1 : 0) - zoom) * Math.min(1, dt * 14);
+  const zoomFov = w.scope ? 22 : 62;
+  camera.fov = THREE.MathUtils.lerp(BASE_FOV + sprintFov, zoomFov, zoom);
+  camera.updateProjectionMatrix();
+}
+
+function updateCamera(dt) {
+  shake = Math.max(0, shake - dt);
+  camera.position.set(player.pos.x + rand(-1, 1) * shake * 0.15, player.pos.y + player.eye + rand(-1, 1) * shake * 0.15, player.pos.z);
+  camera.rotation.set(player.pitch, player.yaw, player.dead ? Math.min(0.5, (3 - deathT) * 0.5) : 0);
+}
+
+function updateViewmodel(dt) {
+  const w = WEAPONS[cur], st = ammoState[cur];
+  guns.forEach((g, i) => g.visible = i === cur);
+  const scoped = w.scope && zoom > 0.7;
+  vm.visible = !scoped && !player.dead;
+  recoil *= Math.exp(-12 * dt);
+  swayX *= Math.exp(-8 * dt); swayY *= Math.exp(-8 * dt);
+  const hs = Math.hypot(player.vel.x, player.vel.z);
+  if (player.onGround) bobPhase += hs * dt * 1.6;
+  const bobAmt = player.onGround ? Math.min(1, hs / 7) : 0;
+  const ads = zoom;
+  const base = w.vmPos;
+  const adsX = THREE.MathUtils.lerp(base.x, 0, ads * 0.85), adsY = THREE.MathUtils.lerp(base.y, -0.13, ads * 0.85);
+  let rx = recoil * w.kickRot, rz = 0, dy = 0;
+  if (st.reloading) {
+    const p = (time - st.reloadStart) / w.reload, e = Math.sin(clamp(p, 0, 1) * Math.PI);
+    rx -= e * 0.6; rz = e * 0.5; dy = -e * 0.08;
+  }
+  dy -= swapT / 0.28 * 0.35;
+  vm.position.set(
+    adsX + Math.sin(bobPhase) * 0.012 * bobAmt - swayX,
+    adsY + Math.abs(Math.cos(bobPhase)) * 0.012 * bobAmt + swayY + dy - (player.onGround ? 0 : 0.02),
+    base.z + recoil * w.kickZ
+  );
+  vm.rotation.set(rx, swayX * 2, rz);
+  flashT -= dt;
+  const fl = guns[cur].userData.flash;
+  fl.visible = flashT > 0;
+  if (fl.visible) { fl.scale.setScalar(rand(0.8, 1.6) * (cur === 1 ? 1.6 : 1)); fl.rotation.z = rand(0, 6); }
+}
+
+// ============================================================
+//  Loop
+// ============================================================
+const clock = new THREE.Clock();
+function frame() {
+  requestAnimationFrame(frame);
+  const dt = Math.min(clock.getDelta(), 0.05);
+  const running = locked && !game.won;   // unlocked mid-game = paused
+  if (running && started) {
+    time += dt;
+    updatePlayer(dt);
+    updateProjectiles(dt);
+    updateWaves(dt);
+    for (const m of monkeys) updateMonkey(m, dt);
+    updateParticles(dt);
+    updateRings(dt);
+    updateEnemyShots(dt);
+    updateSupplies(dt);
+    updatePickups(dt);
+    hurtFlash = Math.max(0, hurtFlash - dt * 2);
+  } else if (!started) {
+    // idle menu camera orbit
+    time += dt;
+    const a = time * 0.08;
+    camera.position.set(Math.sin(a) * 30, 14, Math.cos(a) * 30);
+    camera.lookAt(0, 2, 0);
+    for (const m of monkeys) updateMonkey(m, dt);
+  }
+  if (started) { updateCamera(dt); updateViewmodel(dt); }
+  else vm.visible = false;
+  for (const c of clouds) { c.position.x += dt * 1.5; if (c.position.x > 160) c.position.x = -160; }
+  updateDamageNumbers(dt);
+  updateHUD(dt);
+
+  // pass 1: world, pass 2: viewmodel on top (never clips into walls)
+  renderer.clear();
+  camera.layers.set(0);
+  renderer.render(scene, camera);
+  renderer.clearDepth();
+  camera.layers.set(1);
+  const bg = scene.background; scene.background = null;
+  renderer.shadowMap.autoUpdate = false;
+  renderer.render(scene, camera);
+  renderer.shadowMap.autoUpdate = true;
+  scene.background = bg;
+}
+frame();
+</script>
+</body>
+</html>
